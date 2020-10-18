@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+	<AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
+    <Type Name="_prevnext&lt;*&gt;" Inheritable="false">
+      <DisplayString>{*($T1*)this}</DisplayString>
+      <!--<DisplayString>{v}</DisplayString>-->
+      <Expand>
+        <Item Name="prev">prev</Item>
+        <Item Name="next">next</Item>
+      </Expand>
+    </Type>
+    <Type Name="prevnext&lt;*&gt;" Inheritable="false">
+      <DisplayString>{*($T1*)this}</DisplayString>
+      <Expand>
+        <Item Name="prev">prev</Item>
+        <Item Name="next">next</Item>
+        <Synthetic Name="previous Items">
+          <Expand>
+            <LinkedListItems>
+              <HeadPointer>($T1*)this</HeadPointer>
+              <NextPointer>prev</NextPointer>
+              <ValueNode>($T1*)this</ValueNode>
+            </LinkedListItems>
+          </Expand>
+        </Synthetic>
+        <Synthetic Name="next Items">
+          <Expand>
+            <LinkedListItems>
+              <HeadPointer>($T1*)this</HeadPointer>
+              <NextPointer>next</NextPointer>
+              <ValueNode>this</ValueNode>
+            </LinkedListItems>
+          </Expand>
+        </Synthetic>
+      </Expand>
+    </Type>
+    <Type Name="Item&lt;*&gt;">
+      <DisplayString>Value: {($T1)data}</DisplayString>
+    </Type>    
+</AutoVisualizer>

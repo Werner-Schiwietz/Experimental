@@ -1,0 +1,31 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.29728.190
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "UT_Allerei", "UT_Allerei\UT_Allerei.vcxproj", "{B6DB7E51-3EF4-47E1-8CDC-6AF028F45FDB}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|x64 = Debug|x64
+		Debug|x86 = Debug|x86
+		Release|x64 = Release|x64
+		Release|x86 = Release|x86
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{B6DB7E51-3EF4-47E1-8CDC-6AF028F45FDB}.Debug|x64.ActiveCfg = Debug|x64
+		{B6DB7E51-3EF4-47E1-8CDC-6AF028F45FDB}.Debug|x64.Build.0 = Debug|x64
+		{B6DB7E51-3EF4-47E1-8CDC-6AF028F45FDB}.Debug|x86.ActiveCfg = Debug|Win32
+		{B6DB7E51-3EF4-47E1-8CDC-6AF028F45FDB}.Debug|x86.Build.0 = Debug|Win32
+		{B6DB7E51-3EF4-47E1-8CDC-6AF028F45FDB}.Release|x64.ActiveCfg = Release|x64
+		{B6DB7E51-3EF4-47E1-8CDC-6AF028F45FDB}.Release|x64.Build.0 = Release|x64
+		{B6DB7E51-3EF4-47E1-8CDC-6AF028F45FDB}.Release|x86.ActiveCfg = Release|Win32
+		{B6DB7E51-3EF4-47E1-8CDC-6AF028F45FDB}.Release|x86.Build.0 = Release|Win32
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {82AF9AC4-291C-4E06-ADC1-373681D72978}
+	EndGlobalSection
+EndGlobal
