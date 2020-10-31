@@ -33,6 +33,12 @@
     <ClCompile Include="UT_Calling.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="UT_Clipboard.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="UT_ret_type_bool.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="pch.h">

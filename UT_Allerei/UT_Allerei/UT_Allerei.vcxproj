@@ -168,9 +168,11 @@
     </ClCompile>
     <ClCompile Include="UT_Ableitung.cpp" />
     <ClCompile Include="UT_Allerei.cpp" />
+    <ClCompile Include="UT_Clipboard.cpp" />
     <ClCompile Include="UT_Exception.cpp" />
     <ClCompile Include="UT_Calling.cpp" />
     <ClCompile Include="UT_NatvisDoubleE10.cpp" />
+    <ClCompile Include="UT_ret_type_bool.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="pch.h" />

@@ -56,11 +56,19 @@ namespace stdex//brauchbar
 		return std::make_shared<pointer_element_t, _Ty &&>( std::forward<_Ty>(v) );
 	}
 }
-namespace stdex//das bringt nichts, wird nur mit expliciten template-parameter verwendet. einfacher immer dereferenzieren
+namespace stdex//das bringt nichts
 {
-	template<typename _Ty,template <typename _Ty> class _Ptr=std::shared_ptr> auto make_shared( _Ptr<_Ty> const & v_ptr )
+	template<typename ... _Tys,template<typename _Ty> class _Ptr=std::shared_ptr> auto make_shared( _Ptr<_Tys...> const & v_ptr )//das bringt nichts, wird nur mit expliciten template-parameter verwendet. einfacher immer dereferenzieren
 	{
 		return make_shared( *v_ptr );
+	}
+	template<typename ... _Tys,template<typename _Ty> class _Ptr=std::shared_ptr> auto make_shared_copy( _Ptr<_Tys...> const & v_ptr )//das geht
+	{
+		return make_shared( *v_ptr );
+	}
+	template<typename element_t, typename ... _Tys,template<typename ... _Ty> class _Ptr=std::shared_ptr> auto const_shared( _Ptr<element_t,_Tys...> const & v_ptr )//das geht
+	{
+		return  std::shared_ptr<element_t const,_Tys...>(  v_ptr );
 	}
 	//template<class _Ty> auto make_shared( std::shared_ptr<_Ty> const & v_ptr )
 	//{
@@ -333,6 +341,9 @@ namespace UTAllerei
 			//auto ptr2 = std::make_shared<A>(ptr);//compile-fehler
 			auto ptr3 = stdex::make_shared(ptr);//macht leider einen shared_ptr<shared_ptr<A>>, und keinen shared_ptr<A>
 			auto ptr4 = stdex::make_shared<decltype(ptr)::element_type>(ptr);//zu kompliziert, fehleranfällig. macht keinen shared_ptr<shared_ptr<A>>, sondern einen shared_ptr<A>
+			auto ptr5 = stdex::make_shared_copy(ptr);
+			auto ptr6 = stdex::const_shared(ptr);
+			auto ptr7 = stdex::const_shared(ptr6);
 
 			auto ptr2 = stdex::make_shared(*ptr);//so am einfachsten, macht keinen shared_ptr<shared_ptr<A>>, sondern einen shared_ptr<A>
 			Assert::IsTrue(ptr2!=ptr);
