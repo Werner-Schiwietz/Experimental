@@ -254,7 +254,53 @@ namespace UT_compare_bool
 			//	Assert::IsTrue( a1.toValueType()==false );
 			//}
 		}
-
+		TEST_METHOD(UT_test_ret_type_return_struct)
+		{
+			struct A
+			{
+				struct get_ret_type{std::string str{};int i{};};
+				WS::return_type<get_ret_type> get(bool error)
+				{
+					if(error)
+						return {};
+					return {get_ret_type{{"hallo"},{5}}};
+				}
+			};
+			A a;
+			if( auto v=a.get(false))
+			{
+				Assert::IsTrue(v.toValueType().str=="hallo");
+				Assert::IsTrue(v.toValueType().i==5);
+			}
+			else
+				Assert::Fail();
+			if( auto v=a.get(true))
+				Assert::Fail();
+		}
+		TEST_METHOD(UT_test_ret_type_return_tuple)
+		{
+			struct A
+			{
+				WS::return_type<std::tuple<std::string,int,bool>> get(bool error)
+				{
+					if(error)
+						return {};
+					return {std::tuple<std::string,int,bool>{{"hallo"},{5},{false}}};
+				}
+			};
+			A a;
+			if( auto v=a.get(false))
+			{
+				auto const &[str,i,f] = v.toValueType();//Structured binding (since C++17)
+				Assert::IsTrue(str=="hallo");
+				Assert::IsTrue(i==5);
+				Assert::IsTrue(f==false);
+			}
+			else
+				Assert::Fail();
+			if( auto v=a.get(true))
+				Assert::Fail();
+		}
 		TEST_METHOD(UT_test_ret_type_return)
 		{
 			enum my_errors{invalid=-1,none,err1,err2,err3};
