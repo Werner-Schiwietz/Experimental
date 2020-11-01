@@ -174,7 +174,6 @@
     <ClCompile Include="UT_Exception.cpp" />
     <ClCompile Include="UT_Calling.cpp" />
     <ClCompile Include="UT_NatvisDoubleE10.cpp" />
-    <ClCompile Include="UT_ret_type_bool.cpp" />
     <ClCompile Include="UT_template_struct_ctor_mtor.cpp" />
   </ItemGroup>
   <ItemGroup>
