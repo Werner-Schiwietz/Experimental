@@ -39,6 +39,9 @@
     <ClCompile Include="UT_ret_type_bool.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="UT_template_struct_ctor_mtor.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="pch.h">

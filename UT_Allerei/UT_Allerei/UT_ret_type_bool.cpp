@@ -17,16 +17,21 @@ namespace WS
 		friend bool operator==(bool l, compare_bool const & r) { return r==l;}
 		friend bool operator!=(bool l, compare_bool const & r) { return r!=l;}
 	};
-	template<typename value_type> struct return_type : compare_bool
+	enum class return_type_error_code : __int8
+	{
+		invalid = -1, //-1 allgemeiner fehler, oder nicht initialisiert
+		none,		  //0 bedeutet immer kein fehler
+	};
+	template<typename value_type,typename error_code=return_type_error_code> struct return_type : compare_bool
 	{
 		using value_t = value_type;
-		//using compare_bool::operator bool;
-		value_t		value {};
-		bool		valid = false;
+		using error_code_t = error_code;
+		value_t			value {};
+		error_code_t	error_code = error_code_t(-1);
 
 		return_type() noexcept(noexcept(value_t{})) {}
-		return_type(value_t const & value) noexcept(noexcept(value_t(value))) : value(value),valid(true) {}
-		return_type(value_t && value) noexcept(noexcept(value_t(std::move(value)))): value(std::move(value)),valid(true) {}
+		return_type(error_code_t error_code) noexcept(noexcept(value_t{})) : error_code(error_code) {}
+		template<typename T>return_type(T && value) noexcept(noexcept(std::decay_t<value_t>(std::forward<T>(value)))) : value(std::forward<T>(value)),error_code(error_code_t(0)) {}
 
 		//bool operator==(value_t const & r) const { return toValueType()==r;}
 		//bool operator!=(value_t const & r) const { return toValueType()!=r;}
@@ -37,7 +42,7 @@ namespace WS
 		explicit operator value_t const & () const &	{return this->value;} 
 		explicit operator value_t & () &				{return this->value;} 
 		explicit operator value_t && () &&				{return std::move(this->value);}//ohoh nutzung ohne prüfung ob valid? value nach aufruf evtl. leer aber valid-status bleibt ggf. true
-		bool Valid() const override						{return this->valid;}
+		bool Valid() const override						{return this->error_code==error_code_t(0);}
 	};
 }
 
@@ -46,6 +51,52 @@ namespace UT_compare_bool
 	TEST_CLASS(UT_ret_type)
 	{
 	public:
+		TEST_METHOD(UT_test_ret_type_noexcept)
+		{
+			struct X
+			{
+				X() noexcept {}
+				X( X const & ) noexcept(false){} 
+				X( X && ) noexcept{} 
+			};
+			struct Z
+			{
+				Z() {}
+				Z( Z const & ) {} 
+				Z( Z && ) noexcept{} 
+			};
+
+			{
+				auto noexc1 = noexcept( X() );
+				auto noexc2 = noexcept( X(std::declval<X>()) );
+				auto noexc3 = noexcept( X(std::declval<X const &>() ) );
+				Assert::IsTrue( noexc1 );
+				Assert::IsTrue( noexc2 );
+				Assert::IsFalse( noexc3 );
+
+				auto noexc1_ = noexcept( WS::return_type<X>() );
+				auto noexc2_ = noexcept( WS::return_type<X>(std::declval<X&&>()) );
+				auto noexc3_ = noexcept( WS::return_type<X>( std::declval<X const &>() ) );
+				Assert::AreEqual(noexc1,noexc1_);
+				Assert::AreEqual(noexc2,noexc2_);
+				Assert::AreEqual(noexc3,noexc3_);
+			}
+			{
+				auto noexc1 = noexcept( Z() );								//Z()
+				auto noexc2 = noexcept( Z(std::move(std::declval<Z>())) );	//Z(Z&&)
+				auto noexc3 = noexcept( Z( std::declval<Z const>() ) );		//Z(Z const &)
+				Assert::IsFalse( noexc1 );
+				Assert::IsTrue( noexc2 );
+				Assert::IsFalse( noexc3 );
+
+				auto noexc1_ = noexcept( WS::return_type<Z>() );							//Z()
+				auto noexc2_ = noexcept( WS::return_type<Z>(std::declval<Z>()) );			//Z(Z&&)
+				auto noexc3_ = noexcept( WS::return_type<Z>(std::declval<Z const &>() ) );	//Z(Z const &)
+				Assert::AreEqual(noexc1,noexc1_);
+				Assert::AreEqual(noexc2,noexc2_);
+				Assert::AreEqual(noexc3,noexc3_);
+			}
+		}
 		TEST_METHOD(UT_test_compare_bool)
 		{
 			struct A : WS::compare_bool
@@ -166,7 +217,6 @@ namespace UT_compare_bool
 
 				Assert::IsTrue( value.toValueType() != s);
 				Assert::IsTrue( s == "Hallo" );
-
 			}
 			else
 			{
@@ -204,51 +254,115 @@ namespace UT_compare_bool
 			//	Assert::IsTrue( a1.toValueType()==false );
 			//}
 		}
-		TEST_METHOD(UT_test_ret_type_noexcept)
+
+		TEST_METHOD(UT_test_ret_type_return)
 		{
-			struct X
+			enum my_errors{invalid=-1,none,err1,err2,err3};
+			struct A
 			{
-				X() noexcept {}
-				X( X const & ) noexcept(false){} 
-				X( X && ) noexcept{} 
+				std::string str="hallo";
+				WS::return_type<std::string const &,my_errors> getok()
+				{
+					return {str};
+				};
+				WS::return_type<std::string const &,my_errors> get1()
+				{
+					return {my_errors::err1};//ich bin mir nicht sicher, warum das funktioniert, wegen der std::string const & ohne objekt auf das referenziert werden kann !!?
+				}
+				WS::return_type<std::string const &,my_errors> get2(){return {my_errors::err2};}
+				WS::return_type<std::string const &,my_errors> get3(){return {my_errors::err3};}
 			};
-			struct Z
+			A a;
+			if( auto v=a.getok())
 			{
-				Z() {}
-				Z( Z const & ) {} 
-				Z( Z && ) noexcept{} 
+				Assert::IsTrue(v.toValueType()=="hallo");
+				Assert::IsTrue(&v.toValueType()==&a.str);//als ref auf a.str
+			}
+			else
+				Assert::Fail();
+			if( auto v=a.get1())
+				Assert::Fail();
+			else
+			{
+				auto x = v.toValueType();x;
+				Assert::IsTrue( v.error_code == my_errors::err1 );
+			}
+			if( auto v=a.get2())
+				Assert::Fail();
+			else
+				Assert::IsTrue( v.error_code == my_errors::err2 );
+			if( auto v=a.get3())
+				Assert::Fail();
+			else
+				Assert::IsTrue( v.error_code == my_errors::err3 );
+		}
+		TEST_METHOD(UT_test_ret_type_return2)
+		{
+			enum my_errors{invalid=-1,none,err1,err2,err3};
+			struct A
+			{
+				std::string str="hallo";
+				WS::return_type<std::string,my_errors> getok1()
+				{
+					return {str};//als kopie 
+				};
+				WS::return_type<std::string,my_errors> getok2()
+				{
+					{
+						std::string ret{str};
+						return {ret};//als kopie 
+					}
+				};
+				WS::return_type<std::string,my_errors> getok3()
+				{
+					{
+						std::string ret{str};
+						return {std::move( ret )};//als rvalue-kopie 
+					}
+				};
+				WS::return_type<std::string ,my_errors> get1()
+				{
+					return {my_errors::err1};//ich bin mir nicht sicher, warum das funktioniert, wegen der std::string const & ohne objekt auf das referenziert werden kann !!?
+				}
 			};
-
+			A a;
+			if( auto v=a.getok1())
 			{
-				auto noexc1 = noexcept( X() );
-				auto noexc2 = noexcept( X(std::declval<X>()) );
-				auto noexc3 = noexcept( X(std::declval<X const>() ) );
-				Assert::IsTrue( noexc1 );
-				Assert::IsTrue( noexc2 );
-				Assert::IsFalse( noexc3 );
-
-				auto noexc1_ = noexcept( WS::return_type<X>() );
-				auto noexc2_ = noexcept( WS::return_type<X>(std::move(std::declval<X>())) );
-				auto noexc3_ = noexcept( WS::return_type<X>( std::declval<X const>() ) );
-				Assert::AreEqual(noexc1,noexc1_);
-				Assert::AreEqual(noexc2,noexc2_);
-				Assert::AreEqual(noexc3,noexc3_);
+				Assert::IsTrue( v.toValueType()=="hallo" );
+				Assert::IsTrue(&v.toValueType()!=&a.str);//als kopie
 			}
+			else
+				Assert::Fail();
+			if( auto v=a.getok2())
 			{
-				auto noexc1 = noexcept( Z() );								//Z()
-				auto noexc2 = noexcept( Z(std::move(std::declval<Z>())) );	//Z(Z&&)
-				auto noexc3 = noexcept( Z( std::declval<Z const>() ) );		//Z(Z const &)
-				Assert::IsFalse( noexc1 );
-				Assert::IsTrue( noexc2 );
-				Assert::IsFalse( noexc3 );
-
-				auto noexc1_ = noexcept( WS::return_type<Z>() );							//Z()
-				auto noexc2_ = noexcept( WS::return_type<Z>(std::declval<Z>()) );			//Z(Z&&)
-				auto noexc3_ = noexcept( WS::return_type<Z>(std::declval<Z const>() ) );	//Z(Z const &)
-				Assert::AreEqual(noexc1,noexc1_);
-				Assert::AreEqual(noexc2,noexc2_);
-				Assert::AreEqual(noexc3,noexc3_);
+				Assert::IsTrue( v.toValueType()=="hallo" );
+				Assert::IsTrue(&v.toValueType()!=&a.str);//als kopie
 			}
+			else
+				Assert::Fail();
+			if( auto v=a.getok3())
+			{
+				Assert::IsTrue( v.toValueType()=="hallo" );
+				Assert::IsTrue(&v.toValueType()!=&a.str);//als kopie
+			}
+			else
+				Assert::Fail();
+
+			if( auto v=a.get1())
+				Assert::Fail();
+			else
+			{
+				auto x = v.toValueType();
+				x=x;
+			}
+		}
+		TEST_METHOD(UT_referenz_ohne_objekt)
+		{
+			//std::string & str {}; //error C2440: 'initializing': cannot convert from 'initializer list' to 'std::string &'
+
+			std::string const & cstr {};//das ist bestimmt wieder so ein microsoft-mist, ohne warning
+			Assert::IsTrue( &cstr!=nullptr );
+			//cstr = "hallo";//error C2678: binary '=': no operator found which takes a left-hand operand of type 'const std::string' (or there is no acceptable conversion)
 		}
 	};
 }

@@ -84,7 +84,7 @@ namespace UT_Clipboard
 				Assert::IsTrue( openclipboard );
 				Assert::IsTrue( openclipboard.is_open() );
 
-				auto x = GetOpenClipboardWindow();
+				auto x = GetOpenClipboardWindow();x;
 				openclipboard.close();
 				Assert::IsFalse( openclipboard );
 				Assert::IsFalse( openclipboard.is_open() );
