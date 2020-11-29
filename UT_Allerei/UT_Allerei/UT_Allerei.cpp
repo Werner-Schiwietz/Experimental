@@ -93,6 +93,24 @@ namespace test1
 
 namespace UTAllerei
 {
+	TEST_CLASS(UT_value_holder)
+	{
+		template<typename... T> struct value_holder
+		{
+			template<T... Values> // expands to a non-type template parameter 
+			struct apply { };     // list, such as <int, char, int(&)[5]>
+		};
+	public:
+		TEST_METHOD(UT_vh)
+		{
+			//value_holder<int, char const *> ;
+			value_holder<int, short>::apply<5,4> xx ;xx;
+			int i=1;
+			i++;
+			++i;
+			
+		}
+	};
 	TEST_CLASS(UT_cpp__interface)
 	{
 		struct Test : ITest
@@ -291,14 +309,14 @@ namespace UTAllerei
 				auto a = A{};
 				auto const & ca = a;
 				{
-				#pragma warning(suppress:4239)//warning C4239: nonstandard extension used: 'initializing': conversion from 'UTAllerei::UT_shared_ptr::A' to 'UTAllerei::UT_shared_ptr::A &'
-					A & ra = A{6};ra;//keine gute idee, referenz auf ein rvalue, aber der compiler macht den dtor erst später??
-					Assert::IsTrue(ra.value==6);
+					//#pragma warning(suppress:4239)//warning C4239: nonstandard extension used: 'initializing': conversion from 'UTAllerei::UT_shared_ptr::A' to 'UTAllerei::UT_shared_ptr::A &'
+					//A & ra = A{6};ra;//mit 16.8.2 error////keine gute idee, referenz auf ein rvalue, aber der compiler macht den dtor erst später??
+					//Assert::IsTrue(ra.value==6);
 
 					getA7();//hier wird der destructor von A sofort durchlaufen
-				#pragma warning(suppress:4239)//warning C4239: nonstandard extension used: 'initializing': conversion from 'UTAllerei::UT_shared_ptr::A' to 'UTAllerei::UT_shared_ptr::A &'
-					A & ra7 = getA7();ra7;//keine gute idee, referenz auf ein rvalue, aber der compiler macht den dtor erst später??
-					Assert::IsTrue(ra7.value==7);
+					//#pragma warning(suppress:4239)//warning C4239: nonstandard extension used: 'initializing': conversion from 'UTAllerei::UT_shared_ptr::A' to 'UTAllerei::UT_shared_ptr::A &'
+					//A & ra7 = getA7();ra7;//keine gute idee, referenz auf ein rvalue, aber der compiler macht den dtor erst später??
+					//Assert::IsTrue(ra7.value==7);
 				}
 				int v = A{};v;
 				//int & v = A{};//error C2440: 'initializing': cannot convert from 'UTAllerei::UT_shared_ptr::A' to 'int &'

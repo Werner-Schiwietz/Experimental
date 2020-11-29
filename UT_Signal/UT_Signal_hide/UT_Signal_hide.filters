@@ -3,11 +3,11 @@
   <ItemGroup>
     <Filter Include="Source Files">
       <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
-      <Extensions>cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+      <Extensions>cpp;c;cc;cxx;c++;cppm;ixx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
     </Filter>
     <Filter Include="Header Files">
       <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
-      <Extensions>h;hh;hpp;hxx;hm;inl;inc;ipp;xsd</Extensions>
+      <Extensions>h;hh;hpp;hxx;h++;hm;inl;inc;ipp;xsd</Extensions>
     </Filter>
     <Filter Include="Resource Files">
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
@@ -15,31 +15,28 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="UT_Allerei.cpp">
+    <ClCompile Include="UT_Signal.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="pch.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="UT_NatvisDoubleE10.cpp">
+    <ClCompile Include="UT_Signal_ohne_imp.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="UT_Exception.cpp">
+    <ClCompile Include="Source.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="UT_Ableitung.cpp">
+    <ClCompile Include="signals_imp.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="UT_Calling.cpp">
+    <ClCompile Include="Signaled1.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="UT_Clipboard.cpp">
+    <ClCompile Include="Signaled2.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="UT_template_struct_ctor_mtor.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="UT_is_shared_ptr.cpp">
+    <ClCompile Include="Signal.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -47,13 +44,20 @@
     <ClInclude Include="pch.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="Signal.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="signal_imp.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Signaled1.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Signaled2.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <Natvis Include="doubleE10.natvis">
-      <Filter>Source Files</Filter>
-    </Natvis>
-    <Natvis Include="ableitungs.natvis">
-      <Filter>Source Files</Filter>
-    </Natvis>
+    <None Include="packages.config" />
   </ItemGroup>
 </Project>
