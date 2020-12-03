@@ -5,6 +5,7 @@ using namespace Microsoft::VisualStudio::CppUnitTestFramework;
 
 #include "signal.h"
 
+
 namespace _1
 {
 	template<typename T>struct Combiner
@@ -62,6 +63,23 @@ namespace _3
 //	};
 //}
 
+namespace
+{
+	bool foo1(int a, int b)
+	{
+		return a==b;
+	}
+	struct foo2
+	{
+		bool operator()(int a,int b)
+		{
+			return a==b;
+		}
+	};
+	auto foo3 = [](int a, int b)->bool{return a==b;};
+	auto foo4 = [v=5](int a, int b)->bool{return a==b;};
+	std::function<bool(int,int)> foo;
+}
 
 namespace UTSignal
 {
@@ -75,7 +93,7 @@ namespace UTSignal
 		{
 			A<int(char const*)> a1;a1;
 			A<int(char const*,short)> a2;a2;
-			A<int(char const*)>::signatur_t xx;xx;
+			std::function<A<int(char const*)>::signatur_t> xx;xx;
 			A<int(char const*)>::return_type r;r;
 			using first_t=decltype(A<int(char const*,short)>::tuple_t::_Myfirst);
 			//decltype(A<int()>::tuple_t::_Myfirst);
@@ -166,6 +184,20 @@ namespace UTSignal
 			int i{1};
 			for( ; i<4; ++i )
 				fn(++i);
+		}
+		TEST_METHOD(UT_Signal1)
+		{
+			WS::Signal<bool(int,int)> sig;
+			sig(5,5);
+			{
+				auto connection1 = sig.connect(foo1);
+				auto connection2 = sig.connect(foo2{});
+				auto connection3 = sig.connect(foo3);
+				auto connection4 = sig.connect(foo4);
+				sig(5,5);
+				sig(5,6);
+			}
+			sig(5,5);
 		}
 	};
 }

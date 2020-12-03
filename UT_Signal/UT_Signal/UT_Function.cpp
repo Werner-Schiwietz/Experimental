@@ -41,7 +41,11 @@ template<typename fn_type, typename return_type, typename ... parameter_types>st
 {
     using fn_t              = fn_type;
     using return_t          = return_type;
-//    typedef parameter_types   parameter_t;
+    //typedef parameter_types   parameter_t;
+    //using parameter_t=parameter_types;
+    //using parameter_t...=parameter_types;
+    //using parameter_t...=parameter_types...;
+    //using parameter_t=parameter_types...;
     fn_t fn;
 
     Calling_signatur( fn_t fn ) : fn(fn)
