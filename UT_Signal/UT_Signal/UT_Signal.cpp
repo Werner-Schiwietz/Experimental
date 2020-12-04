@@ -160,6 +160,48 @@ namespace UTSignal
 	TEST_CLASS(UTSignal)
 	{
 	public:
+
+		TEST_METHOD(UT_combiner_last)
+		{
+			using T=int;
+			{
+				WS::combiner_last<T,T{6}> combiner{};
+				Assert::IsTrue( combiner.init_val == T{6} );
+				Assert::IsTrue( combiner() == T{6} );
+			}
+			WS::combiner_last<T> combiner{};
+			Assert::IsTrue( WS::combiner_last<T>::init_val == T{} );
+
+			static_assert(std::is_same_v<void,T> == false );
+			std::optional<T> value;
+			for( auto i : {1,2,4,5} )
+			{
+				value = combiner(i);
+				Assert::IsTrue( value.value()==i );
+			}
+			Assert::IsTrue( value.value()==5);
+		}
+		TEST_METHOD(UT_combiner_last_void)
+		{
+			using T=void;
+			WS::combiner_last<T> combiner{};
+		}
+		TEST_METHOD(UT_combiner_and)
+		{
+			Assert::IsTrue(  WS::combiner_and<bool>{}(true)(true)(true)(true).value.value() );
+			Assert::IsFalse( WS::combiner_and<bool>{}(true)(true)(true)(false).value.value() );
+			Assert::IsFalse( WS::combiner_and<bool>{}(false)(true)(true)(true).value.value() );
+			Assert::IsFalse( WS::combiner_and<bool>{}.value.has_value() );
+		}
+		TEST_METHOD(UT_combiner_or)
+		{
+			Assert::IsTrue(  WS::combiner_or<bool>{}(true)(true)(true)(true).value.value() );
+			Assert::IsTrue( WS::combiner_or<bool>{}(true)(true)(true)(false).value.value() );
+			Assert::IsTrue( WS::combiner_or<bool>{}(false)(true)(true)(true).value.value() );
+			Assert::IsFalse( WS::combiner_or<bool>{}(false)(false)(false)(false).value.value() );
+			Assert::IsFalse( WS::combiner_or<bool>{}.value.has_value() );
+		}
+
 		TEST_METHOD(UT_Combiner_Last_int)
 		{
 			using T=int;
@@ -185,7 +227,37 @@ namespace UTSignal
 			for( ; i<4; ++i )
 				fn(++i);
 		}
-		TEST_METHOD(UT_Signal1)
+		TEST_METHOD(UT_Signal_cominer_and)
+		{
+			WS::Signal<bool(int,int),WS::combiner_and<bool>> sig;
+			Assert::IsFalse( sig(5,5).has_value() );
+			{
+				auto connection1 = sig.connect(foo1);
+				auto connection2 = sig.connect(foo2{});
+				auto connection3 = sig.connect(foo3);
+				auto connection4 = sig.connect(foo4);
+				Assert::IsTrue( sig(5,5).has_value() );
+				Assert::IsTrue(  sig(5,5).value() );
+				Assert::IsFalse( sig(5,6).value() );
+			}
+			Assert::IsFalse( sig(5,5).has_value() );
+		}
+		TEST_METHOD(UT_Signal_cominer_or)
+		{
+			WS::Signal<bool(int,int),WS::combiner_or<bool>> sig;
+			Assert::IsFalse( sig(5,5).has_value() );
+			{
+				auto connection1 = sig.connect(foo1);
+				auto connection2 = sig.connect(foo2{});
+				auto connection3 = sig.connect(foo3);
+				auto connection4 = sig.connect(foo4);
+				Assert::IsTrue( sig(5,5).has_value() );
+				Assert::IsTrue(  sig(5,5).value() );
+				Assert::IsFalse( sig(5,6).value() );
+			}
+			Assert::IsFalse( sig(5,5).has_value() );
+		}
+		TEST_METHOD(UT_Signal_standard_cominerlast)
 		{
 			WS::Signal<bool(int,int)> sig;
 			sig(5,5);
@@ -194,8 +266,46 @@ namespace UTSignal
 				auto connection2 = sig.connect(foo2{});
 				auto connection3 = sig.connect(foo3);
 				auto connection4 = sig.connect(foo4);
+				Assert::IsTrue(  sig(5,5) );
+				Assert::IsFalse( sig(5,6) );
+			}
+			sig(5,5);
+		}
+		TEST_METHOD(UT_Signal_standard_void)
+		{
+			WS::Signal<void(int,int)> sig;
+			sig(5,5);
+			{
+				auto connection1 = sig.connect(foo1);
+				auto connection2 = sig.connect(foo2{});
+				auto connection3 = sig.connect(foo3);
+				auto connection4 = sig.connect(foo4);
 				sig(5,5);
 				sig(5,6);
+			}
+			sig(5,5);
+		}
+		TEST_METHOD(UT_Signal_standard_all)
+		{
+			WS::Signal<bool(int,int),WS::combiner_all<bool>> sig;
+			Assert::IsTrue( sig(5,5).size()==0 );
+			{
+				auto connection1 = sig.connect(foo1);
+				auto connection2 = sig.connect(foo2{});
+				auto connection3 = sig.connect(foo3);
+				auto connection4 = sig.connect(foo4);
+				auto erg = sig(5,5);
+				Assert::IsTrue( erg.size()==4 );
+				Assert::IsTrue( erg[0] );
+				Assert::IsTrue( erg[0]==erg[1] );
+				Assert::IsTrue( erg[0]==erg[2] );
+				Assert::IsTrue( erg[0]==erg[3] );
+				erg = sig(5,6);
+				Assert::IsTrue( erg.size()==4 );
+				Assert::IsFalse( erg[0] );
+				Assert::IsTrue( erg[0]==erg[1] );
+				Assert::IsTrue( erg[0]==erg[2] );
+				Assert::IsTrue( erg[0]==erg[3] );
 			}
 			sig(5,5);
 		}

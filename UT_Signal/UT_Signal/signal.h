@@ -4,6 +4,7 @@
 #include <tuple>
 #include <functional>
 #include <map>
+#include <deque>
 #include <atomic>
 
 namespace WS
@@ -65,7 +66,65 @@ namespace WS
 
 namespace WS
 {
-	template<typename signatur>struct Signal;
+	template<typename T,std::conditional_t<std::is_same<void,T>::value==false, T, int> initvalue=std::conditional_t<std::is_same<void,T>::value==false, T, int>{}> struct combiner_last 
+	{	
+		static constexpr T init_val{initvalue};
+		T value{initvalue};
+		auto operator()(){return this->value;}
+		auto operator()(T const & v_in)&{this->value = v_in;return *this;}
+		auto operator()(T const & v_in) && { return operator()(v_in); }
+		operator T const &(){return value;}
+	};
+	template<> struct combiner_last<void,0> 
+	{	
+	};
+	template<typename T> struct combiner_and
+	{
+		std::optional<T> value;
+		auto operator()(){return this->value;}
+		auto& operator()(T const & v_in) &
+		{
+			if(this->value.has_value())
+				this->value.value() &= v_in;
+			else 
+				this->value = v_in; 
+			return *this; 
+		}
+		auto operator()(T const & v_in) && { return operator()(v_in); }
+		operator T const &(){return value;}
+	};
+	template<typename T> struct combiner_or
+	{
+		std::optional<T> value;
+		auto operator()(){return this->value;}
+		auto& operator()(T const & v_in) &
+		{
+			if(this->value.has_value())
+				this->value.value() |= v_in;
+			else 
+				this->value = v_in; 
+			return *this; 
+		}
+		auto operator()(T const & v_in) && { return operator()(v_in); }
+
+
+		operator T const &(){return value;}
+	};
+	template<typename T> struct combiner_all
+	{
+		std::deque<T> value;
+		auto operator()(){return this->value;}
+		auto& operator()(T const & v_in) &
+		{
+			this->value.push_back(v_in);
+			return *this; 
+		}
+		auto operator()(T const & v_in) && { return operator()(v_in); }
+
+
+		operator T const &(){return value;}
+	};
+
 	template<typename signatur>struct Signal_trait;
 	template<typename return_type, typename ... parameter_types>struct Signal_trait<return_type(parameter_types...)>
 	{
@@ -77,14 +136,17 @@ namespace WS
 	};
 
 	
-	template<typename return_type, typename ... parameter_types>struct Signal<return_type(parameter_types...)> : Signal_trait<return_type(parameter_types...)>
+	template<typename signatur,typename combiner_t=combiner_last<Signal_trait<signatur>::return_t>>struct Signal;
+	template<typename return_type, typename ... parameter_types,typename combiner_type>struct Signal<return_type(parameter_types...),typename combiner_type> : Signal_trait<return_type(parameter_types...)>
 	{
+		using combiner_t=combiner_type;
 		struct Connection_Guard 
 		{
+			using Signal_t=Signal<return_type(parameter_types...),combiner_t>;
 			id_t					id		= 0;
-			Signal<signatur_t> *	signal	= nullptr;
+			Signal_t *				signal	= nullptr;
 			Connection_Guard(){}
-			Connection_Guard(Signal<return_type(parameter_types...)>* signal, id_t id) : signal(signal), id(id){}
+			Connection_Guard(Signal_t* signal, id_t id) : signal(signal), id(id){}
 			~Connection_Guard();
 		};
 		std::map<id_t,fn_t> callbacks;
@@ -99,17 +161,17 @@ namespace WS
 			this->lock.clear();
 			return {this,id};
 		}
-		return_t operator()( parameter_types... args)
+		auto operator()( parameter_types... args)
 		{
 			while(this->lock.test_and_set()){}
 			if constexpr(std::is_same<return_t,void>::value==false)
 			{
-				return_t return_value{};
+				combiner_type combiner{};
 				for(auto &[id,fn] : this->callbacks)
-					return_value = fn(args...);
+					combiner( fn(args...) );
 					//return_value = fn(std::forward<parameter_types>(args)...);
 				this->lock.clear();
-				return return_value;
+				return combiner();
 			}
 			else for(auto & [id,fn] : this->callbacks)
 				fn(args...);
@@ -129,12 +191,12 @@ namespace WS
 		std::atomic<id_t>	last_id = 0;
 		std::atomic_flag	lock {};	
 	};
-	template<typename signatur, typename fn_type> Signal<typename signatur> make_Signal( fn_type fn )
+	template<typename signatur, typename fn_type,typename combiner_t > Signal<typename signatur,combiner_t> make_Signal( fn_type fn )
 	{
 		return Signal<signatur,std::decay<fn_type>>{std::move(fn)};
 	}
 
-	template<typename ret_t,typename...args> Signal<ret_t(args...)>::Connection_Guard::~Connection_Guard()
+	template<typename ret_t,typename...args,typename combiner_t> Signal<ret_t(args...),combiner_t>::Connection_Guard::~Connection_Guard()
 	{
 		if( this->signal )
 		{
