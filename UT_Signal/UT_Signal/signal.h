@@ -6,6 +6,7 @@
 #include <map>
 #include <deque>
 #include <atomic>
+#include <mutex>
 
 namespace WS
 {
@@ -64,6 +65,16 @@ namespace WS
 	};
 }
 
+namespace WS
+{
+	class atomicflag_mutex
+	{
+		std::atomic_flag flag{};
+	public:
+		void lock(){ while (flag.test_and_set());}
+		void unlock(){ flag.clear(); }
+	};
+}
 namespace WS
 {
 	template<typename signatur>struct Signal_trait;
@@ -147,62 +158,69 @@ namespace WS
 			using Signal_t=Signal<return_type(parameter_types...),combiner_t>;
 			id_t					id		= 0;
 			Signal_t *				signal	= nullptr;
+			~Connection_Guard(){disconnect();}
 			Connection_Guard(){}
+			Connection_Guard(Connection_Guard const &) = delete;
+			Connection_Guard(Connection_Guard && r) {swap(r);}
+			Connection_Guard& operator=(Connection_Guard const &)& = delete;
+			Connection_Guard& operator=(Connection_Guard && r )&{Connection_Guard{std::move(r)}.swap(*this);return *this;}
+
 			Connection_Guard(Signal_t* signal, id_t id) : signal(signal), id(id){}
-			~Connection_Guard();
+
+			void swap(Connection_Guard & r)
+			{
+				std::swap(this->id, r.id);
+				std::swap(this->signal, r.signal);
+			}
 
 			[[nodiscard]]
 			id_t release(){signal=nullptr;return id;}//der auf aufrufer verantwortet den disconnect selbst
+			void disconnect();
 		};
 		std::map<id_t,fn_t> callbacks;//Funktionspointer-Verwaltung
 
 		Signal( ) {}
 		template<typename fn_in_t> 
 		[[nodiscard]]
-		Connection_Guard connect( fn_in_t fn ) 
+		Connection_Guard connect( fn_in_t fn ) //für this->operator()(...) objekte evtl connect(std::reference_wrapper(*this)) verwenden, da 'fn' immer kopiert wird
 		{ 
-			while(this->lock.test_and_set()){}
+			std::lock_guard<decltype(locker)> const lock{locker};
 			id_t id = ++last_id; 
 			callbacks[id] = fn;
-			this->lock.clear();
 			return {this,id};
 		}
 		auto operator()( parameter_types... args)
 		{
-			while(this->lock.test_and_set()){}
+			std::lock_guard<decltype(locker)> const lock{locker};
 			if constexpr(std::is_same<return_t,void>::value==false)
 			{
 				combiner_type combiner{};
 				for(auto &[id,fn] : this->callbacks)
 					combiner( fn(args...), id );
 					//return_value = fn(std::forward<parameter_types>(args)...);
-				this->lock.clear();
 				return combiner;
 			}
 			else for(auto & [id,fn] : this->callbacks)
 				fn(args...);
-
-			this->lock.clear();
 		}
 		void disconnect( id_t id )
 		{
 			if( id )
 			{
-				while(this->lock.test_and_set()){}
+				std::lock_guard<decltype(locker)> const lock{locker};
 				callbacks.erase(id);
-				this->lock.clear();
 			}
 		}
 	private:
 		std::atomic<id_t>	last_id = 0;
-		std::atomic_flag	lock {};	
+		atomicflag_mutex	locker {};	
 	};
 	template<typename signatur, typename fn_type,typename combiner_t > Signal<typename signatur,combiner_t> make_Signal( fn_type fn )
 	{
 		return Signal<signatur,std::decay<fn_type>>{std::move(fn)};
 	}
 
-	template<typename ret_t,typename...args,typename combiner_t> Signal<ret_t(args...),combiner_t>::Connection_Guard::~Connection_Guard()
+	template<typename ret_t,typename...args,typename combiner_t> void Signal<ret_t(args...),combiner_t>::Connection_Guard::disconnect( )
 	{
 		if( this->signal )
 		{
@@ -210,4 +228,5 @@ namespace WS
 			this->signal=nullptr;
 		}
 	}
+
 }

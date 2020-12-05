@@ -382,5 +382,53 @@ namespace UTSignal
 			}
 			Assert::IsTrue( sig(5,5)().size()==0 );
 		}
+		TEST_METHOD(UT_Signal_in_class_using)
+		{
+			auto signal = WS::Signal<void(std::string)>{};
+			using signal_t = decltype(signal);
+			using connection_t = signal_t::Connection_Guard;
+			#pragma warning(disable:4996)
+			struct SignalUser
+			{
+				connection_t connection_lamda;
+				connection_t connection_operator;
+				std::string lastFromLambda;
+				std::string lastFromOperator;
+				SignalUser( signal_t & signal)
+				{
+					connection_lamda	= signal.connect([this](std::string value){this->SignalCallback(value);});
+					//connection_operator = signal.connect(*this);//copy-ctor=delete  error C2280: 'UTSignal::UTSignal::UT_Signal_in_class_using::SignalUser::SignalUser(const UTSignal::UTSignal::UT_Signal_in_class_using::SignalUser &)': attempting to reference a deleted function
+					connection_operator = signal.connect(std::reference_wrapper(*this));//reference_wrapper sonst wuerde kopie von this angelegt werden
+				}
+
+				void operator()(std::string const & value)
+				{
+					Logger::WriteMessage( (std::string(__FUNCTION__ " value:") + value).c_str() );
+					lastFromOperator = value;
+				}
+				void SignalCallback(std::string value)
+				{
+					Logger::WriteMessage( (std::string(__FUNCTION__ " value:") + value).c_str() );
+					lastFromLambda = value;
+				}
+			};
+
+			char buf[20];
+			Logger::WriteMessage( (std::string("connetions:") + _itoa(signal.callbacks.size(),buf,10)).c_str() );
+			signal("hallo1");
+			{
+				SignalUser ConnectToSignal(signal);
+				Logger::WriteMessage( (std::string("connetions:") + _itoa(signal.callbacks.size(),buf,10)).c_str() );
+				signal("hallo2");
+				Assert::IsTrue( ConnectToSignal.lastFromLambda=="hallo2");
+				Assert::IsTrue( ConnectToSignal.lastFromOperator=="hallo2");
+				ConnectToSignal.connection_lamda.disconnect();
+				signal("hallo2_1");
+				Assert::IsTrue( ConnectToSignal.lastFromLambda=="hallo2");
+				Assert::IsTrue( ConnectToSignal.lastFromOperator=="hallo2_1");
+			}
+			Logger::WriteMessage( (std::string("connetions:") + _itoa(signal.callbacks.size(),buf,10)).c_str() );
+			signal("hallo3");
+		}
 	};
 }
