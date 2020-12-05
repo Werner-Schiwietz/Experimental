@@ -196,8 +196,8 @@ namespace UTSignal
 		TEST_METHOD(UT_combiner_or)
 		{
 			Assert::IsTrue(  WS::combiner_or<bool>{}(true)(true)(true)(true).value.value() );
-			Assert::IsTrue( WS::combiner_or<bool>{}(true)(true)(true)(false).value.value() );
-			Assert::IsTrue( WS::combiner_or<bool>{}(false)(true)(true)(true).value.value() );
+			Assert::IsTrue(  WS::combiner_or<bool>{}(true)(true)(true)(false).value.value() );
+			Assert::IsTrue(  WS::combiner_or<bool>{}(false)(true)(true)(true).value.value() );
 			Assert::IsFalse( WS::combiner_or<bool>{}(false)(false)(false)(false).value.value() );
 			Assert::IsFalse( WS::combiner_or<bool>{}.value.has_value() );
 		}
@@ -227,37 +227,37 @@ namespace UTSignal
 			for( ; i<4; ++i )
 				fn(++i);
 		}
-		TEST_METHOD(UT_Signal_cominer_and)
+		TEST_METHOD(UT_Signal_combiner_and)
 		{
 			WS::Signal<bool(int,int),WS::combiner_and<bool>> sig;
-			Assert::IsFalse( sig(5,5).has_value() );
+			Assert::IsFalse( sig(5,5)().has_value() );
 			{
 				auto connection1 = sig.connect(foo1);
 				auto connection2 = sig.connect(foo2{});
 				auto connection3 = sig.connect(foo3);
 				auto connection4 = sig.connect(foo4);
-				Assert::IsTrue( sig(5,5).has_value() );
-				Assert::IsTrue(  sig(5,5).value() );
-				Assert::IsFalse( sig(5,6).value() );
+				Assert::IsTrue(  sig(5,5)().has_value() );
+				Assert::IsTrue(  sig(5,5)().value() );
+				Assert::IsFalse( sig(5,6)().value() );
 			}
-			Assert::IsFalse( sig(5,5).has_value() );
+			Assert::IsFalse( sig(5,5)().has_value() );
 		}
-		TEST_METHOD(UT_Signal_cominer_or)
+		TEST_METHOD(UT_Signal_combiner_or)
 		{
 			WS::Signal<bool(int,int),WS::combiner_or<bool>> sig;
-			Assert::IsFalse( sig(5,5).has_value() );
+			Assert::IsFalse( sig(5,5)().has_value() );
 			{
 				auto connection1 = sig.connect(foo1);
 				auto connection2 = sig.connect(foo2{});
 				auto connection3 = sig.connect(foo3);
 				auto connection4 = sig.connect(foo4);
-				Assert::IsTrue( sig(5,5).has_value() );
-				Assert::IsTrue(  sig(5,5).value() );
-				Assert::IsFalse( sig(5,6).value() );
+				Assert::IsTrue(  sig(5,5)().has_value() );
+				Assert::IsTrue(  sig(5,5)().value() );
+				Assert::IsFalse( sig(5,6)().value() );
 			}
-			Assert::IsFalse( sig(5,5).has_value() );
+			Assert::IsFalse( sig(5,5)().has_value() );
 		}
-		TEST_METHOD(UT_Signal_standard_cominerlast)
+		TEST_METHOD(UT_Signal_standard_combinerlast)
 		{
 			WS::Signal<bool(int,int)> sig;
 			sig(5,5);
@@ -270,6 +270,79 @@ namespace UTSignal
 				Assert::IsFalse( sig(5,6) );
 			}
 			sig(5,5);
+		}
+		TEST_METHOD(UT_Signal_own_disconnect_und_method_calling)
+		{
+			WS::Signal<bool(int,int)> sig;
+			decltype(sig)::id_t id5{};
+			decltype(sig)::id_t id6{};
+			decltype(sig)::id_t id7{};
+
+			struct Data
+			{
+				size_t callingcounter = 0;
+				size_t dtorcounter = 0;
+				size_t ctorcounter = 0;
+			}bdata;
+
+			sig(5,5);
+			{
+				struct A
+				{
+					size_t callingcounter = 0;
+					~A()
+					{
+						test_invalid_local_var = {"A"};
+					}
+					std::string test_invalid_local_var{"hallo A"};
+					bool operator()(int l, int r)
+					{
+						++callingcounter;
+						return l==r;
+					}
+				} a;
+				struct B
+				{
+					Data& data;
+					~B(){++data.dtorcounter;}
+					B()=delete;
+					B(B const &)=delete;
+					B(Data& data) : data(data)
+					{
+						++data.ctorcounter;
+					}
+					std::string test_invalid_local_var{"hallo B"};
+					bool operator()(int l, int r)
+					{
+						++data.callingcounter;
+						return l==r;
+					}
+				} b{bdata};
+				
+				{
+					auto connection1 = sig.connect(foo1);
+					auto connection2 = sig.connect(foo2{});
+					auto connection3 = sig.connect(foo3);
+					auto connection4 = sig.connect(foo4);
+					id5 = sig.connect(a).release();//wenn a zerstört wird bleibt der callback in sig erhalten. was passiert? sig legt kopie von a an, nicht das was beabsichtigt war
+					//sig.connect(b);//error C2280: 'UTSignal::UTSignal::UT_Signal_own_disconnect::B::B(const UTSignal::UTSignal::UT_Signal_own_disconnect::B &)': attempting to reference a deleted function
+					//sig.connect<B&>(b);//error C2280: 'UTSignal::UTSignal::UT_Signal_own_disconnect::B::B(const UTSignal::UTSignal::UT_Signal_own_disconnect::B &)': attempting to reference a deleted function
+					id6 = sig.connect(std::reference_wrapper<B>{b}).release();
+					id7 = sig.connect([&b](int l, int r){return b(l,r);}).release();//wenn b kann aber nicht kopiert werden, aber per lambda
+					Assert::IsTrue(  sig(5,5) );
+				}
+				Assert::IsTrue(a.callingcounter==0);//es wurde eine kopie gerufen
+				Assert::IsTrue(b.data.callingcounter==2);
+				Assert::IsFalse( sig(5,6) );
+				Assert::IsTrue(a.callingcounter==0);
+				Assert::IsTrue(b.data.callingcounter==4);
+				Assert::IsTrue(bdata.callingcounter==4);
+			}
+			Assert::IsTrue(bdata.callingcounter==4);
+			Assert::IsTrue(bdata.ctorcounter==bdata.dtorcounter);//eigentlich sind alle objekte kaputt
+			auto erg = sig(5,5);//was passiert mit deleteten objekten(es gibt kein B mehr)? nichts! warum?
+			Assert::IsTrue(bdata.callingcounter==6);
+
 		}
 		TEST_METHOD(UT_Signal_standard_void)
 		{
@@ -288,26 +361,26 @@ namespace UTSignal
 		TEST_METHOD(UT_Signal_standard_all)
 		{
 			WS::Signal<bool(int,int),WS::combiner_all<bool>> sig;
-			Assert::IsTrue( sig(5,5).size()==0 );
+			Assert::IsTrue( sig(5,5)().size()==0 );
 			{
 				auto connection1 = sig.connect(foo1);
 				auto connection2 = sig.connect(foo2{});
 				auto connection3 = sig.connect(foo3);
 				auto connection4 = sig.connect(foo4);
-				auto erg = sig(5,5);
+				auto erg = sig(5,5)();
 				Assert::IsTrue( erg.size()==4 );
-				Assert::IsTrue( erg[0] );
-				Assert::IsTrue( erg[0]==erg[1] );
-				Assert::IsTrue( erg[0]==erg[2] );
-				Assert::IsTrue( erg[0]==erg[3] );
-				erg = sig(5,6);
-				Assert::IsTrue( erg.size()==4 );
-				Assert::IsFalse( erg[0] );
-				Assert::IsTrue( erg[0]==erg[1] );
-				Assert::IsTrue( erg[0]==erg[2] );
-				Assert::IsTrue( erg[0]==erg[3] );
+				Assert::IsTrue( erg[0].first );
+				Assert::IsTrue( erg[0].first==erg[1].first );
+				Assert::IsTrue( erg[0].first==erg[2].first );
+				Assert::IsTrue( erg[0].first==erg[3].first );
+				erg = sig(5,6)();
+				Assert::IsTrue(  erg.size()==4 );
+				Assert::IsFalse( erg[0].first );
+				Assert::IsTrue(  erg[0].first==erg[1].first );
+				Assert::IsTrue(  erg[0].first==erg[2].first );
+				Assert::IsTrue(  erg[0].first==erg[3].first );
 			}
-			sig(5,5);
+			Assert::IsTrue( sig(5,5)().size()==0 );
 		}
 	};
 }

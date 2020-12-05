@@ -66,65 +66,6 @@ namespace WS
 
 namespace WS
 {
-	template<typename T,std::conditional_t<std::is_same<void,T>::value==false, T, int> initvalue=std::conditional_t<std::is_same<void,T>::value==false, T, int>{}> struct combiner_last 
-	{	
-		static constexpr T init_val{initvalue};
-		T value{initvalue};
-		auto operator()(){return this->value;}
-		auto operator()(T const & v_in)&{this->value = v_in;return *this;}
-		auto operator()(T const & v_in) && { return operator()(v_in); }
-		operator T const &(){return value;}
-	};
-	template<> struct combiner_last<void,0> 
-	{	
-	};
-	template<typename T> struct combiner_and
-	{
-		std::optional<T> value;
-		auto operator()(){return this->value;}
-		auto& operator()(T const & v_in) &
-		{
-			if(this->value.has_value())
-				this->value.value() &= v_in;
-			else 
-				this->value = v_in; 
-			return *this; 
-		}
-		auto operator()(T const & v_in) && { return operator()(v_in); }
-		operator T const &(){return value;}
-	};
-	template<typename T> struct combiner_or
-	{
-		std::optional<T> value;
-		auto operator()(){return this->value;}
-		auto& operator()(T const & v_in) &
-		{
-			if(this->value.has_value())
-				this->value.value() |= v_in;
-			else 
-				this->value = v_in; 
-			return *this; 
-		}
-		auto operator()(T const & v_in) && { return operator()(v_in); }
-
-
-		operator T const &(){return value;}
-	};
-	template<typename T> struct combiner_all
-	{
-		std::deque<T> value;
-		auto operator()(){return this->value;}
-		auto& operator()(T const & v_in) &
-		{
-			this->value.push_back(v_in);
-			return *this; 
-		}
-		auto operator()(T const & v_in) && { return operator()(v_in); }
-
-
-		operator T const &(){return value;}
-	};
-
 	template<typename signatur>struct Signal_trait;
 	template<typename return_type, typename ... parameter_types>struct Signal_trait<return_type(parameter_types...)>
 	{
@@ -135,24 +76,89 @@ namespace WS
 		using id_t				= size_t;
 	};
 
+	#pragma region Standard Combiner
+		//Combiner für Signal
+		//Combiner verarbeiten die Rückgabewerte der gerufenen Funktionen
+		template<typename T,std::conditional_t<std::is_same<void,T>::value==false, T, int> initvalue=std::conditional_t<std::is_same<void,T>::value==false, T, int>{}> struct combiner_last 
+		{	//combiner_last liefert in this->value den rückgabewert der letzten gerufenen Funktion, oder, wenn kein Funktion verknüpft ist, den initvalue
+			static constexpr T init_val{initvalue};
+			using id_t = typename Signal_trait<T()>::id_t;
+			T		value{initvalue};
+			id_t	last_signal_handler_id{};
+			auto operator()(){return this->value;}
+			auto operator()(T const & v_in,id_t id={})&{this->last_signal_handler_id=id;this->value = v_in;return *this;}
+			auto operator()(T const & v_in,id_t id={}) && { return operator()(v_in,id); }
+			operator T const &(){return value;}
+		};
+		template<> struct combiner_last<void,0> 
+		{	//spezialisierung rückgabe void kann nicht gesammelt werden, weil funktionen kann kein void-parameter mit namen übergeben werden
+		};
+		template<typename T> struct combiner_and
+		{	//combiner_and liefert alle rückgabewerte mit operator& verknüpft in std::optional<T> value
+			using id_t = typename Signal_trait<T()>::id_t;
+			std::optional<T> value;
+			auto operator()(){return this->value;}
+			auto& operator()(T const & v_in,id_t  ={}) &
+			{
+				if(this->value.has_value())
+					this->value.value() &= v_in;
+				else 
+					this->value = v_in; 
+				return *this; 
+			}
+			auto operator()(T const & v_in,id_t id={}) && { return operator()(v_in,id); }
+		};
+		template<typename T> struct combiner_or
+		{	//combiner_and liefert alle rückgabewerte mit operator| verknüpft in std::optional<T> value
+			using id_t = typename Signal_trait<T()>::id_t;
+			std::optional<T> value;
+			auto operator()(){return this->value;}
+			auto& operator()(T const & v_in,id_t id={}) & 
+			{
+				if(this->value.has_value())
+					this->value.value() |= v_in;
+				else 
+					this->value = v_in; 
+				return *this; 
+			}
+			auto  operator()(T const & v_in,id_t id={}) && { return operator()(v_in,id); }
+		};
+		template<typename T> struct combiner_all
+		{	//combiner_and liefert alle rückgabewerte in std::deque<std::pair<T,id_t>> value. der id_t ist die id, die beim Signal.connect im Connection_Guard geliefert wurde
+			using id_t = typename Signal_trait<T()>::id_t;
+			std::deque<std::pair<T,id_t>> value;
+			auto operator()(){return this->value;}
+			auto& operator()(T const & v_in,id_t id={}) & 
+			{
+				this->value.push_back({v_in,id});
+				return *this; 
+			}
+			auto  operator()(T const & v_in,id_t id={}) && { return operator()(v_in,id); }
+		};
+	#pragma endregion
+
 	
 	template<typename signatur,typename combiner_t=combiner_last<Signal_trait<signatur>::return_t>>struct Signal;
 	template<typename return_type, typename ... parameter_types,typename combiner_type>struct Signal<return_type(parameter_types...),typename combiner_type> : Signal_trait<return_type(parameter_types...)>
 	{
 		using combiner_t=combiner_type;
 		struct Connection_Guard 
-		{
+		{	//Connection_Guard entfernt automatisch im dtor die callback-funktion aus der Signal-Funktionspointer-Verwaltung
 			using Signal_t=Signal<return_type(parameter_types...),combiner_t>;
 			id_t					id		= 0;
 			Signal_t *				signal	= nullptr;
 			Connection_Guard(){}
 			Connection_Guard(Signal_t* signal, id_t id) : signal(signal), id(id){}
 			~Connection_Guard();
+
+			[[nodiscard]]
+			id_t release(){signal=nullptr;return id;}//der auf aufrufer verantwortet den disconnect selbst
 		};
-		std::map<id_t,fn_t> callbacks;
+		std::map<id_t,fn_t> callbacks;//Funktionspointer-Verwaltung
 
 		Signal( ) {}
 		template<typename fn_in_t> 
+		[[nodiscard]]
 		Connection_Guard connect( fn_in_t fn ) 
 		{ 
 			while(this->lock.test_and_set()){}
@@ -168,22 +174,22 @@ namespace WS
 			{
 				combiner_type combiner{};
 				for(auto &[id,fn] : this->callbacks)
-					combiner( fn(args...) );
+					combiner( fn(args...), id );
 					//return_value = fn(std::forward<parameter_types>(args)...);
 				this->lock.clear();
-				return combiner();
+				return combiner;
 			}
 			else for(auto & [id,fn] : this->callbacks)
 				fn(args...);
 
 			this->lock.clear();
 		}
-		void disconnect( Connection_Guard & connection )
+		void disconnect( id_t id )
 		{
-			if( connection.id )
+			if( id )
 			{
 				while(this->lock.test_and_set()){}
-				callbacks.erase(connection.id);
+				callbacks.erase(id);
 				this->lock.clear();
 			}
 		}
@@ -200,7 +206,7 @@ namespace WS
 	{
 		if( this->signal )
 		{
-			this->signal->disconnect(*this);
+			this->signal->disconnect(this->id);
 			this->signal=nullptr;
 		}
 	}
