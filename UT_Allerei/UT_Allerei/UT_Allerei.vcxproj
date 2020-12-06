@@ -176,6 +176,7 @@
     <ClCompile Include="UT_is_shared_ptr.cpp" />
     <ClCompile Include="UT_NatvisDoubleE10.cpp" />
     <ClCompile Include="UT_template_struct_ctor_mtor.cpp" />
+    <ClCompile Include="UT_variadic_template_Paramtypes.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="pch.h" />

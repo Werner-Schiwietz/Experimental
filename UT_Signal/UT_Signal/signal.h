@@ -67,11 +67,11 @@ namespace WS
 
 namespace WS
 {
-	class atomicflag_mutex
+	class mutex_atomicflag
 	{
 		std::atomic_flag flag{};
 	public:
-		void lock(){ while (flag.test_and_set());}
+		void lock(){ while (flag.test_and_set()){} }
 		void unlock(){ flag.clear(); }
 	};
 }
@@ -213,12 +213,8 @@ namespace WS
 		}
 	private:
 		std::atomic<id_t>	last_id = 0;
-		atomicflag_mutex	locker {};	
+		mutex_atomicflag	locker {};	
 	};
-	template<typename signatur, typename fn_type,typename combiner_t > Signal<typename signatur,combiner_t> make_Signal( fn_type fn )
-	{
-		return Signal<signatur,std::decay<fn_type>>{std::move(fn)};
-	}
 
 	template<typename ret_t,typename...args,typename combiner_t> void Signal<ret_t(args...),combiner_t>::Connection_Guard::disconnect( )
 	{
@@ -228,5 +224,4 @@ namespace WS
 			this->signal=nullptr;
 		}
 	}
-
 }
