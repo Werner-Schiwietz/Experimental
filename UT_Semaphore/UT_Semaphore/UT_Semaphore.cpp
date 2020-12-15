@@ -1,6 +1,6 @@
 #include "pch.h"
 #include "CppUnitTest.h"
-#include "Windows.h"
+//#include "Windows.h"
 
 using namespace Microsoft::VisualStudio::CppUnitTestFramework;
 
@@ -9,6 +9,7 @@ using namespace Microsoft::VisualStudio::CppUnitTestFramework;
 #include <atomic>
 #include <mutex>
 #include <condition_variable>
+
 
 namespace 
 {
@@ -20,6 +21,9 @@ namespace
 	{
 		Logger::WriteMessage(text);
 	}
+
+	//#pragma warning(suppress:4455)
+	//short operator"" sh(unsigned long long int v) noexcept {return short(v);}
 }
 
 namespace WS
@@ -27,13 +31,15 @@ namespace WS
 	class Semaphore
 	{
 		std::mutex					pulse_mutex{};
-		std::mutex					mu{};
+		std::mutex					wait_mutex{};
 		std::condition_variable		cv{};
 		std::atomic_bool			running{false};
 		std::atomic<size_t>			waiting{0};
 
 	public:
+		bool is_running() const {return running;}
 		bool operator()() const {return running;}
+		operator bool () const {return running;}
 
 		
 		void wait( )//geht zuverlässig mit pulse
@@ -42,7 +48,7 @@ namespace WS
 
 			if(running==false)
 			{
-				std::unique_lock<std::mutex> lk( mu );
+				std::unique_lock<std::mutex> lk( wait_mutex );
 				++waiting;
 				cv.wait( lk, [this,&pulse_lock]
 					{
@@ -59,7 +65,7 @@ namespace WS
 		void set_blocked(){running=false;}
 		void pulse() //mit wait
 		{
-			const std::lock_guard<decltype(pulse_mutex)> lock(pulse_mutex);//blockiert neue wait-aufrufe und damit das hochzäh len von waiting
+			const std::lock_guard<decltype(pulse_mutex)> lock(pulse_mutex);//blockiert neue wait-aufrufe und damit das hochzählen von waiting
 			set_running();
 			cv.notify_all();
 			while( waiting )
@@ -155,5 +161,60 @@ namespace UTSemaphore
 			while( threads_running )
 				std::this_thread::yield();
 		}
+		TEST_METHOD( lock_at_100_mal_2000 )
+		{
+			WS::Semaphore		sema;
+			bool				ready{false};
+			std::atomic<size_t>	counter{0};
+
+			sema.set_running();
+			auto threadfunction = [&]
+			{
+				for(;ready==false;)
+				{
+					if( ++counter == 100 )
+					{
+						sema.set_blocked();
+						sema.wait();//so tun als ob alle daten verarbeitet sind. wir legen uns schlafen
+					}
+					if( counter >= 100 )
+						throw std::runtime_error(__FUNCTION__ " counter sollte wieder bei 0 sein");//ohne try catch abort
+				}
+			};
+			auto t1 = std::thread(threadfunction);
+			auto releasethreadfunction = [&]
+			{
+				size_t counter_inner{2000};
+				while( ready==false )
+				{
+					if( sema.is_running()==false )
+					{
+						counter=0;
+						if( --counter_inner == 0 )
+							ready=true;//threads beenden
+						sema.set_running();
+					}
+					else
+					{
+						using namespace std::chrono_literals;
+						std::this_thread::sleep_for(3us);//???mit 1 us oder yield gehen scheinbar die notify_all verloren???
+						//std::this_thread::yield();
+					}
+				}
+			};
+			auto t2 = std::thread(releasethreadfunction);
+
+			t1.join();
+			t2.join();
+		}
+		TEST_METHOD( inc_100_mal_20000 )
+		{
+			for( std::atomic<size_t>	counter{0}; counter<100*20000; )
+			{
+				++counter;
+			}
+
+		}
+
 	};
 }
