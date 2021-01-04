@@ -40,7 +40,7 @@ namespace UTAllerei
 			std::string s{"hallo"};
 
 			using typelist = WS::typelist<int,short,char const *,std::string &>;
-			static_assert( typelist::count==4 );
+			static_assert( typelist::size==4 );
 			typelist::type<0> v1 {};v1;
 			typelist::type<1> v2 {};v2;
 			typelist::type<2> v3 {};v3;
@@ -56,7 +56,7 @@ namespace UTAllerei
 
 			{
 				using typelist = WS::typelist<int,short,char const *, std::string &>;
-				static_assert( typelist::count==4 );
+				static_assert( typelist::size==4 );
 
 				typelist::tuple_t tuple{1,2i16,"hallo",s};
 				Assert::IsTrue(std::get<0>(tuple)==1);
