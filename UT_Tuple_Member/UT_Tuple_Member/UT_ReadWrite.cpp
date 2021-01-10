@@ -1,0 +1,424 @@
+#include "pch.h"
+#include "CppUnitTest.h"
+
+using namespace Microsoft::VisualStudio::CppUnitTestFramework;
+
+#include "ReadWrite_char_t.h"
+#include "ReadWrite_char_t_array.h"
+#include "ReadWriteInterfaceFuerCFile.h"
+
+
+#include "..\..\..\WernersTools\headeronly\Auto_Ptr.h"
+#include "..\..\..\WernersTools\headeronly\is_.h"
+
+static_assert( WS::is_dereferenceable_v<char const *> ) ;
+static_assert( WS::is_pointerable_v<char const *> ) ;
+static_assert( WS::is_dereferenceable<std::unique_ptr<char const *>>::value ) ;
+static_assert( WS::is_pointerable<std::unique_ptr<char const *>>::value ) ;
+static_assert( WS::is_dereferenceable<std::unique_ptr<char *>>::value ) ;
+static_assert( WS::is_pointerable<std::unique_ptr<char *>>::value ) ;
+static_assert( WS::is_dereferenceable<std::unique_ptr<char []>>::value==false ) ;
+static_assert( WS::is_pointerable<std::unique_ptr<char []>>::value==false ) ;
+
+//std::remove_reference_t<decltype( *(std::unique_ptr<char>{}) )> x1;
+//std::remove_reference_t<decltype( *(std::unique_ptr<char []>{}) )> x2;
+//std::remove_reference_t<decltype( std::unique_ptr<char []>{}.get() )> x3;
+
+
+template<typename char_t> auto equal_0_terminiert(char_t const * v1,char_t const * v2) -> std::enable_if_t<WS::is_char_type_v<char_t>,bool> //char_t muss char oder wchar_t sein
+{ 
+	return stringcmp(v1,v2)==0;
+}
+namespace dereferenced
+{
+	//equal sonderbehandlung 
+	//	pointer und smart-pointer (std::unique_ptr,std::shared_ptr,WS::autp_ptr)
+	//	für char_t const *. Diese werden als 0-terminierte strings verglichen
+	template<typename T> auto equal( T const & _1, T const & _2 ) 
+	{
+		return _1 == _2;
+	}
+	template<typename T, typename equal_t> auto equal( T const & _1, T const & _2, equal_t && vergl ) 
+	{
+		return vergl(_1,_2);
+	}
+
+	template<typename T> auto equal( T * const & p1, T * const & p2 ) 
+	{
+		if( p1 == p2 )
+			return true;
+		if( p1 && p2 )
+		{
+			if constexpr ( WS::is_char_type_v<T> ) 
+				return equal_0_terminiert(p1,p2);
+			else 
+				return equal(*p1,*p2);
+		}
+
+		return false;
+	}
+	template<typename T, typename equal_t> auto equal( T * p1, T * p2, equal_t && vergl ) 
+	{
+		if( p1 == p2 )
+			return true;
+		if( p1 && p2 )
+			return vergl(p1,p2);
+
+		return false;
+	}
+
+	#pragma region smart-ptr
+		template<typename T> auto equal( std::unique_ptr<T> const & p1, std::unique_ptr<T> const & p2 ) 
+		{
+			return equal( p1.get(),  p2.get() );
+		}
+		template<typename T, typename equal_t> auto equal( std::unique_ptr<T> const & p1, std::unique_ptr<T> const & p2, equal_t && vergl )
+		{
+			return equal( p1.get(),  p2.get(), std::move(vergl) );
+		}
+		template<typename T> auto equal( std::shared_ptr<T> const & p1, std::shared_ptr<T> const & p2 ) 
+		{
+			return equal( p1.get(),  p2.get() );
+		}
+		template<typename T, typename equal_t> auto equal( std::shared_ptr<T> const & p1, std::shared_ptr<T> const & p2, equal_t && vergl )
+		{
+			return equal( p1.get(),  p2.get(), std::move(vergl) );
+		}
+		template<typename T> auto equal( WS::auto_ptr<T> const & p1, WS::auto_ptr<T> const & p2 ) 
+		{
+			return equal( p1.get(),  p2.get() );
+		}
+		template<typename T, typename equal_t> auto equal( WS::auto_ptr<T> const & p1, WS::auto_ptr<T> const & p2, equal_t && vergl )
+	{
+		return equal( p1.get(),  p2.get(), std::move(vergl) );
+	}
+	#pragma endregion 
+}
+
+
+struct A
+{
+	int									v1	= 1;
+	short								v2	= 2;
+	std::unique_ptr<char[]>				v3;
+	std::unique_ptr<wchar_t[]>			v4;
+	std::unique_ptr<unsigned short>		v5;
+	std::unique_ptr<unsigned __int64>	v6;
+
+	static_assert( WS::is_dereferenceable_v<std::unique_ptr<wchar_t>> );
+	//static_assert( WS::is_dereferenceable_v<std::unique_ptr<wchar_t[]>> );
+
+	bool operator==(A const & r) const
+	{
+		return this->v1 == r.v1
+			&& this->v2 == r.v2
+			&& dereferenced::equal(this->v3,r.v3, equal_0_terminiert<char> )
+			&& dereferenced::equal(this->v4,r.v4 )//, equal_0_terminiert<wchar_t> )//geht auch automatisch
+			&& dereferenced::equal(this->v5,r.v5)
+			&& dereferenced::equal(this->v6,r.v6);
+	}
+};
+void ReadData( CFile* pFile, A & value )
+{
+	ReadData(pFile,value.v1);
+	ReadData(pFile,value.v2);
+	ReadData(pFile,value.v3);
+	ReadData(pFile,value.v4);
+	ReadData(pFile,value.v5);
+	ReadData(pFile,value.v6);
+}
+void ReadData( ReadWrite_CFile&& io, A & value )//weil in UT_WriteDataReadData_struct_als_unique_ptr ReadData(ReadWrite_CFile(file), valueRead); statt ReadData(pFile, valueRead) steht
+{
+	ReadData( &io.File, value );
+}
+void WriteData( CFile* pFile, A const & value )
+{
+	WriteData(pFile,value.v1);
+	WriteData(pFile,value.v2);
+	WriteData(pFile,value.v3);
+	WriteData(pFile,value.v4);
+	WriteData(pFile,value.v5);
+	WriteData(pFile,value.v6);
+}
+
+namespace UT_ReadWriteData
+{
+	TEST_CLASS(UT_ReadWriteData)
+	{
+	public:
+		TEST_METHOD(UT_WriteDataReadData)
+		{
+			CMemFile file;
+			auto source_inteface	= ReadWrite_CFile(file);
+			auto dest_inteface		= ReadWrite_CFile(file);
+
+			WriteData( dynamic_cast<CFile&>(file), 5i32 );
+			WriteData( file, 6i16 );
+			WriteData( dest_inteface, 7i64 );
+
+			WriteData( file, (char *)nullptr);
+			WriteData( file, (char const*)"hallo");
+			WriteData( file, (wchar_t const*)L"hallo");
+			WriteData( file, "hallo");//schreibt das array mit 5 zeichen ohne 0-terminierung, wenn ReadWrite_char_t_array.h includiert
+
+			WriteData( file, strlen("hallo"));
+			WriteData( file, "hallo", strlen("hallo"));//schreibt das zeichen bis zur 0-terminierung. 
+
+			wchar_t chararray5[5]{L'h',L'a',L'l',L'l',L'o'};//nicht 0-terminiert
+			WriteData( file, chararray5);//schreibt das array mit 5 zeichen
+			wchar_t chararray20[20]{L"hallo"};// 0-terminiert
+			WriteData( file, chararray20);//schreibt das array mit 5 zeichen
+
+
+			int int_values[]{3,1,0,2};
+			//auto ptr = int_values;
+			//WriteData( file, ptr );//error C2607: static assertion failed. so soll es sein
+			WriteData( file, int_values );
+
+			auto written = file.GetPosition();
+			file.Seek(0,CFile::begin);
+
+			Assert::IsTrue( ReadData<__int32>( file ) == 5 );
+			__int16 value;ReadData( source_inteface, value );Assert::IsTrue( value==6 );
+			Assert::IsTrue( ReadData<__int64>( dynamic_cast<CFile&>(file) ) == 7 );
+			std::unique_ptr<char[]> text{ ReadData<char*>( file ) };
+			Assert::IsTrue( text == nullptr );
+			ReadData( file, text );
+			Assert::IsTrue( strcmp(text.get(),"hallo")==0);
+			std::unique_ptr<wchar_t[]> ltext{ ReadData<wchar_t*>( file ) };
+			Assert::IsTrue( wcscmp(ltext.get(),L"hallo")==0);
+			//ReadData<char[6]>( file );
+			char h6[_countof("hallo")];
+			ReadData( file, h6 );//liest das array mit 6-zeichen
+			Assert::IsTrue( memcmp(h6,"hallo",sizeof(h6))==0);
+			char h5[_countof("hallo")-1];
+			ReadData( file, h5, ReadData<decltype(strlen("hallo"))>(file) );//liest erst die geschriebene länge, dann die daten des arrays, 5-zeichen
+			Assert::IsTrue( memcmp(h5,"hallo",sizeof(h5))==0);
+
+			wchar_t chararray5_in[5];
+			ReadData( file, chararray5_in );//liest das array mit 5-zeichen nicht null-terminiert
+			Assert::IsTrue( stringncmp(chararray5_in,chararray5,_countof(chararray5))==0 );
+			wchar_t chararray20_in[20];
+			ReadData( file, chararray20_in );//liest das array mit 5-zeichen null-terminiert
+			Assert::IsTrue( stringncmp(chararray20_in,chararray20,_countof(chararray20))==0 );
+			
+
+
+			int int_values2[]{0,1,2,3};
+			ReadData( file, int_values2 );
+			Assert::IsTrue( memcmp(int_values,int_values2,sizeof(int_values2))==0 );
+
+
+			Assert::IsTrue( file.GetPosition() == written );
+		}
+
+		TEST_METHOD(UT_WriteDataReadData_int64)
+		{
+			CMemFile file;
+			CFile* pFile = &file;
+
+				auto value = 0x0102030405060708i64;
+			WriteData( file, value );
+
+				auto written = file.GetPosition();
+				Assert::IsTrue( written == sizeof(value) );
+
+				file.Seek(0,CFile::begin);
+
+			auto valueRead = ReadData<decltype(value)>(file);
+				Assert::IsTrue( value == valueRead );
+
+				Assert::IsTrue( file.GetPosition() == written );
+				file.Seek(0,CFile::begin);
+
+				valueRead=0;
+			ReadData(pFile, valueRead);
+				Assert::IsTrue( value == valueRead );
+
+				Assert::IsTrue( file.GetPosition() == written );
+				file.Seek(0,CFile::begin);
+		}
+		TEST_METHOD(UT_WriteDataReadData_WS_auto_ptr)
+		{
+			CMemFile file;
+			CFile* pFile = &file;
+
+				WS::auto_ptr<short> value;
+			WriteData( file, value );
+				value = std::make_unique<decltype(value)::element_type>( 5i16 );
+			WriteData( file, value );
+
+				auto written = file.GetPosition();
+				file.Seek(0,CFile::begin);
+
+			auto valueRead = ReadData<decltype(value)>(file);
+				Assert::IsTrue( valueRead == nullptr);
+			ReadData(pFile,valueRead);
+				Assert::IsTrue( *valueRead == *value );
+
+				Assert::IsTrue( file.GetPosition() == written );
+				file.Seek(0,CFile::begin);
+		}
+		TEST_METHOD(UT_WriteDataReadData_std_unique_ptr)
+		{
+			CMemFile file;
+			CFile* pFile = &file;
+
+				std::unique_ptr<short> value;
+			WriteData( file, value );
+				value = std::make_unique<decltype(value)::element_type>( 5i16 );
+			WriteData( file, value );
+
+				auto written = file.GetPosition();
+				file.Seek(0,CFile::begin);
+
+			auto valueRead = ReadData<decltype(value)>(file);
+				Assert::IsTrue( valueRead == nullptr);
+			ReadData(pFile,valueRead);
+				Assert::IsTrue( *valueRead == *value );
+
+				Assert::IsTrue( file.GetPosition() == written );
+				file.Seek(0,CFile::begin);
+		}
+		TEST_METHOD(UT_WriteDataReadData_std_shared_ptr)
+		{
+			CMemFile file;
+			CFile* pFile = &file;
+
+				std::shared_ptr<short> value;
+			WriteData( file, value );
+				value = std::make_unique<decltype(value)::element_type>( 5i16 );
+			WriteData( file, value );
+
+				auto written = file.GetPosition();
+				file.Seek(0,CFile::begin);
+
+			auto valueRead = ReadData<decltype(value)>(file);
+				Assert::IsTrue( valueRead == nullptr);
+			ReadData(pFile,valueRead);
+				Assert::IsTrue( *valueRead == *value );
+
+				Assert::IsTrue( file.GetPosition() == written );
+				file.Seek(0,CFile::begin);
+		}
+		TEST_METHOD(UT_WriteDataReadData_signed_char_array)//signed char und unsigned char sind kein char_type also immer das ganze array speichern
+		{
+			CMemFile file;
+			CFile* pFile = &file;
+
+				signed char value[4]{2,3,0,1};
+			WriteData( file, value );
+
+				auto written = file.GetPosition();
+				Assert::IsTrue( written == sizeof(value) );
+
+				file.Seek(0,CFile::begin);
+
+				decltype(value) valueRead;
+			ReadData(pFile, valueRead);
+				Assert::IsTrue( memcmp(value,valueRead,sizeof(valueRead))==0 );
+
+				Assert::IsTrue( file.GetPosition() == written );
+				file.Seek(0,CFile::begin);
+		}
+		TEST_METHOD(UT_WriteDataReadData_char_array)//char ist ein char_type, dann wird ggf nur bis zur 0-ternminierung gespeichert
+		{
+			CMemFile file;
+			CFile* pFile = &file;
+
+			char value[4]{2,3,0,1};
+			WriteData( pFile, value );//bis zur 0
+
+			auto written = file.GetPosition();
+
+			file.Seek(0,CFile::begin);
+
+			decltype(value) valueRead;
+			ReadData(file, valueRead);
+			Assert::IsTrue( stringncmp(value,valueRead,sizeof(valueRead))==0 );
+
+			Assert::IsTrue( file.GetPosition() == written );
+			file.Seek(0,CFile::begin);
+		}
+		TEST_METHOD(UT_WriteDataReadData_string)//char und wchar_t sind z.zt. strings
+		{
+			CMemFile file;
+			CFile* pFile = &file;
+
+			char const * value = nullptr;
+			WriteData( pFile, value );//nullptr
+			value = "";
+			WriteData( pFile, value );//leerstring
+			value = "hallo";
+			WriteData( pFile, value );//bis zur 0
+
+			auto written = file.GetPosition();
+
+			file.Seek(0,CFile::begin);
+
+			std::unique_ptr<std::remove_cv_t<std::remove_pointer_t<decltype(value)>>[]> valueRead ;//[] wichtig 
+			ReadData(file, valueRead);
+			Assert::IsTrue( valueRead==nullptr );
+			ReadData(file, valueRead);
+			Assert::IsTrue( stringcmp("",valueRead.get())==0 );
+			ReadData(file, valueRead);
+			Assert::IsTrue( stringcmp(value,valueRead.get())==0 );
+
+			Assert::IsTrue( file.GetPosition() == written );
+			file.Seek(0,CFile::begin);
+		}
+		TEST_METHOD(UT_WriteDataReadData_struct)
+		{
+			CMemFile file;
+			CFile* pFile = &file;
+			
+			A value{
+				5
+				,6
+				,std::unique_ptr<char[]>{_strdup("hallo")}
+				,std::unique_ptr<wchar_t[]>{_wcsdup(L"welt")}
+				,std::make_unique<unsigned short>(5ui16) };
+
+			WriteData( pFile, value );//nullptr
+
+			auto written = file.GetPosition();
+			file.Seek(0,CFile::begin);
+
+			A valueRead;
+
+			ReadData(pFile, valueRead);
+			Assert::IsTrue( valueRead==value );
+
+			Assert::IsTrue( file.GetPosition() == written );
+			file.Seek(0,CFile::begin);
+		}
+		TEST_METHOD(UT_WriteDataReadData_struct_als_unique_ptr)
+		{
+			CMemFile file;
+			CFile* pFile = &file;
+
+			auto value = std::unique_ptr<A>{ new A
+											 {
+												5
+												,6
+												,std::unique_ptr<char[]>{_strdup("hallo")}
+												,std::unique_ptr<wchar_t[]>{_wcsdup(L"welt")}
+												,std::make_unique<unsigned short>(5ui16) 
+											 }
+										   };
+			WriteData( ReadWrite_CFile(file), decltype(value){}  );//nullptr
+			WriteData( pFile, value );
+
+			auto written = file.GetPosition();
+			file.Seek(0,CFile::begin);
+
+			auto valueRead = ReadData<decltype(value)>(pFile);
+			Assert::IsTrue( valueRead==nullptr );
+			ReadData(ReadWrite_CFile(file), valueRead);
+			Assert::IsTrue( dereferenced::equal(valueRead,value) );
+
+			Assert::IsTrue( file.GetPosition() == written );
+			file.Seek(0,CFile::begin);
+		}
+	};
+}
