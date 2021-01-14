@@ -9,6 +9,7 @@ using namespace Microsoft::VisualStudio::CppUnitTestFramework;
 
 #include "ReadWrite_char_t.h"
 #include "ReadWrite_char_t_array.h"
+#include "derefernce.h"
 
 #include <afx.h>//CFile
 
@@ -20,10 +21,10 @@ struct struct_name
 	using member = enum_type;
 	tuple_t values{};
 
-	template<member index> auto & operator()() &		{return std::get<index>(this->values);}//funktioniert, aber bringt für den aufrufer nichts, nur unverständnis. aufruf per v.[template ]operator()<0>(); [template ] optinal evtl. bei einigen compilern nötig
-	template<member index> auto   operator()()  &&		{return std::get<index>(this->values);}//funktioniert, aber bringt für den aufrufer nichts, nur unverständnis
+	template<member index> auto & operator()() &		{return std::get<index>(this->values);}				//operator() funktioniert, aber bringt für den aufrufer nichts, nur unverständnis. aufruf per v.[template ]operator()<0>(); [template ] optinal evtl. bei einigen compilern nötig
+	template<member index> auto   operator()()  &&		{return std::move(std::get<index>(this->values));}	//operator() funktioniert, aber bringt für den aufrufer nichts, nur unverständnis
 	template<member index> auto & access() &			{return std::get<index>(this->values);}
-	template<member index> auto   access() &&			{return std::get<index>(this->values);}
+	template<member index> auto   access() &&			{return std::move(std::get<index>(this->values));}
 
 	template<member index,typename T> struct_name& set(T&&value) &	
 	{
@@ -36,23 +37,14 @@ struct struct_name
 		return std::move(*this);
 	}
 };
-template<typename io_interface, template<typename...> typename struct_name,typename enum_type,typename ... types> void WriteData( io_interface && io, struct_name<enum_type,types...> const & value  )
-{
-	io;value;
-	
 
-	//std::make_index_sequence<sizeof...(types)> indexs;
-	//auto write =[&](auto const & v ){ WriteData(std::forward<io_interface>(io),v); };
-	//(...,write(value.values.access<indexs>));  
-	//auto write = [&]( auto const & value){WriteData(std::forward<io_interface>(io),value);}
-	//std::apply( write, value.values );
-}
-template<typename io_interface, template<typename...> typename struct_name,typename enum_type,typename ... types> void ReadData( io_interface && io, struct_name<enum_type,types...> & value  )
+template<typename io_interface, typename enum_type,typename ... types> void WriteData( io_interface && io, struct_name<enum_type,types...> const & value  )
 {
-	io;value;
-	std::make_index_sequence<sizeof...(types)> x;x;
-	//auto read= [&]( auto & value){ReadData(std::forward<io_interface>(io),value);}
-	//std::apply( read, value.values );
+	WriteData( std::forward<io_interface>(io), value.values );
+}
+template<typename io_interface, typename enum_type,typename ... types> void ReadData( io_interface && io, struct_name<enum_type,types...> & value  )
+{
+	ReadData( std::forward<io_interface>(io), value.values );
 }
 
 namespace enumNS
@@ -97,11 +89,19 @@ namespace UT_TupleMember
 		TEST_METHOD(UT_struct_name_WriteData_ReadData)
 		{
 			enum member{type_name0,type_name1};
-			using s_type = struct_name<member,int,char const *>;
-			auto s = s_type{}.set<s_type::member::type_name0>(5).set<s_type::member::type_name1>("hallo");
+			using s_type = struct_name<member,int,std::unique_ptr<char[]>>;
+			auto str2=std::unique_ptr<char[]>{_strdup("hallo")};
+			std::unique_ptr<char[]> str;
+			auto & rstr = str;
+			rstr = std::move(str2);
+
+			auto s = s_type{}.set<s_type::member::type_name0>(5);//.set<s_type::member::type_name1>(std::move(str));
 
 			CMemFile file;
 			WriteData( file, s );
+			s.set<s_type::member::type_name1>( std::unique_ptr<char[]>(_strdup("hallo")) );
+			WriteData( file, s );
+
 
 			file.Seek(0,CFile::begin);
 
@@ -110,8 +110,15 @@ namespace UT_TupleMember
 			ReadData( file, s_read );
 
 			Assert::IsTrue( s_read.access<decltype(s)::member::type_name0>() == s.access<decltype(s)::member::type_name0>());
-			Assert::IsFalse( s_read.access<decltype(s)::member::type_name1>() == s.access<decltype(s)::member::type_name1>());
-			Assert::IsTrue( stringcmp(s_read.access<decltype(s)::member::type_name1>(),s.access<decltype(s)::member::type_name1>())==0 );
+			Assert::IsTrue( s_read.access<decltype(s)::member::type_name1>() == s_type{}.access<decltype(s)::member::type_name1>() );//nullptr sind gleich
+			Assert::IsTrue(  dereferenced::equal( s_read.access<decltype(s)::member::type_name1>(),s_type{}.access<decltype(s)::member::type_name1>()) );
+
+			ReadData( file, s_read );
+			Assert::IsTrue( s_read.access<decltype(s)::member::type_name0>() == s.access<decltype(s)::member::type_name0>());
+			Assert::IsFalse( s_read.access<decltype(s)::member::type_name1>() == s.access<decltype(s)::member::type_name1>());//pointer sind unterschiedlich
+			Assert::IsTrue(  dereferenced::equal( s_read.access<decltype(s)::member::type_name1>(),s.access<decltype(s)::member::type_name1>()) );//inhalt ist gleich
+
+
 
 		}
 		TEST_METHOD(TestMethod3)

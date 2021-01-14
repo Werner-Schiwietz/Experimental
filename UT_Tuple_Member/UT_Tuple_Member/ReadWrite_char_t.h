@@ -28,7 +28,9 @@ template<typename io_interface,typename char_t> auto ReadData( io_interface && i
 	else
 	{
 		value=new char_t[chars+1];
-		ReadData( std::forward<io_interface>(io), value, chars*sizeof(char_t) );
+		
+		ReadData( std::forward<io_interface>(io), value, chars * sizeof(char_t) );
+		//_ReadData( std::forward<io_interface>(io), (void*)value, chars*sizeof(char_t) );
 		value[chars] = char_t{0};
 	}
 }
@@ -47,6 +49,7 @@ template<typename io_interface,typename char_t> auto WriteData( io_interface && 
 		auto chars = static_cast<size_t>(stringlen(value));
 		WriteData( std::forward<io_interface>(io), chars );
 		WriteData( std::forward<io_interface>(io), value, chars * sizeof(char_t) );
+		//_WriteData( std::forward<io_interface>(io), value, chars * sizeof(char_t) );
 	}
 	else
 		WriteData( std::forward<io_interface>(io), size_t(-1) );

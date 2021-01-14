@@ -6,7 +6,7 @@ using namespace Microsoft::VisualStudio::CppUnitTestFramework;
 #include "ReadWrite_char_t.h"
 #include "ReadWrite_char_t_array.h"
 #include "ReadWriteInterfaceFuerCFile.h"
-
+#include "derefernce.h"
 
 #include "..\..\..\WernersTools\headeronly\Auto_Ptr.h"
 #include "..\..\..\WernersTools\headeronly\is_.h"
@@ -23,77 +23,6 @@ static_assert( WS::is_pointerable<std::unique_ptr<char []>>::value==false ) ;
 //std::remove_reference_t<decltype( *(std::unique_ptr<char>{}) )> x1;
 //std::remove_reference_t<decltype( *(std::unique_ptr<char []>{}) )> x2;
 //std::remove_reference_t<decltype( std::unique_ptr<char []>{}.get() )> x3;
-
-
-template<typename char_t> auto equal_0_terminiert(char_t const * v1,char_t const * v2) -> std::enable_if_t<WS::is_char_type_v<char_t>,bool> //char_t muss char oder wchar_t sein
-{ 
-	return stringcmp(v1,v2)==0;
-}
-namespace dereferenced
-{
-	//equal sonderbehandlung 
-	//	pointer und smart-pointer (std::unique_ptr,std::shared_ptr,WS::autp_ptr)
-	//	für char_t const *. Diese werden als 0-terminierte strings verglichen
-	template<typename T> auto equal( T const & _1, T const & _2 ) 
-	{
-		return _1 == _2;
-	}
-	template<typename T, typename equal_t> auto equal( T const & _1, T const & _2, equal_t && vergl ) 
-	{
-		return vergl(_1,_2);
-	}
-
-	template<typename T> auto equal( T * const & p1, T * const & p2 ) 
-	{
-		if( p1 == p2 )
-			return true;
-		if( p1 && p2 )
-		{
-			if constexpr ( WS::is_char_type_v<T> ) 
-				return equal_0_terminiert(p1,p2);
-			else 
-				return equal(*p1,*p2);
-		}
-
-		return false;
-	}
-	template<typename T, typename equal_t> auto equal( T * p1, T * p2, equal_t && vergl ) 
-	{
-		if( p1 == p2 )
-			return true;
-		if( p1 && p2 )
-			return vergl(p1,p2);
-
-		return false;
-	}
-
-	#pragma region smart-ptr
-		template<typename T> auto equal( std::unique_ptr<T> const & p1, std::unique_ptr<T> const & p2 ) 
-		{
-			return equal( p1.get(),  p2.get() );
-		}
-		template<typename T, typename equal_t> auto equal( std::unique_ptr<T> const & p1, std::unique_ptr<T> const & p2, equal_t && vergl )
-		{
-			return equal( p1.get(),  p2.get(), std::move(vergl) );
-		}
-		template<typename T> auto equal( std::shared_ptr<T> const & p1, std::shared_ptr<T> const & p2 ) 
-		{
-			return equal( p1.get(),  p2.get() );
-		}
-		template<typename T, typename equal_t> auto equal( std::shared_ptr<T> const & p1, std::shared_ptr<T> const & p2, equal_t && vergl )
-		{
-			return equal( p1.get(),  p2.get(), std::move(vergl) );
-		}
-		template<typename T> auto equal( WS::auto_ptr<T> const & p1, WS::auto_ptr<T> const & p2 ) 
-		{
-			return equal( p1.get(),  p2.get() );
-		}
-		template<typename T, typename equal_t> auto equal( WS::auto_ptr<T> const & p1, WS::auto_ptr<T> const & p2, equal_t && vergl )
-	{
-		return equal( p1.get(),  p2.get(), std::move(vergl) );
-	}
-	#pragma endregion 
-}
 
 
 struct A
@@ -162,7 +91,7 @@ namespace UT_ReadWriteData
 			WriteData( file, "hallo");//schreibt das array mit 5 zeichen ohne 0-terminierung, wenn ReadWrite_char_t_array.h includiert
 
 			WriteData( file, strlen("hallo"));
-			WriteData( file, "hallo", strlen("hallo"));//schreibt das zeichen bis zur 0-terminierung. 
+			WriteData( file, "hallo", strlen("hallo") );//schreibt die zeichen bis zur 0-terminierung. 
 
 			wchar_t chararray5[5]{L'h',L'a',L'l',L'l',L'o'};//nicht 0-terminiert
 			WriteData( file, chararray5);//schreibt das array mit 5 zeichen
@@ -192,7 +121,7 @@ namespace UT_ReadWriteData
 			ReadData( file, h6 );//liest das array mit 6-zeichen
 			Assert::IsTrue( memcmp(h6,"hallo",sizeof(h6))==0);
 			char h5[_countof("hallo")-1];
-			ReadData( file, h5, ReadData<decltype(strlen("hallo"))>(file) );//liest erst die geschriebene länge, dann die daten des arrays, 5-zeichen
+			ReadData( file, h5);//liest erst die geschriebene länge, dann die daten des arrays, 5-zeichen
 			Assert::IsTrue( memcmp(h5,"hallo",sizeof(h5))==0);
 
 			wchar_t chararray5_in[5];
