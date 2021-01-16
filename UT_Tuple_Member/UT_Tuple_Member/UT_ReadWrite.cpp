@@ -5,11 +5,18 @@ using namespace Microsoft::VisualStudio::CppUnitTestFramework;
 
 #include "ReadWrite_char_t.h"
 #include "ReadWrite_char_t_array.h"
+#include "ReadWrite_container.h"
 #include "ReadWriteInterfaceFuerCFile.h"
 #include "derefernce.h"
 
 #include "..\..\..\WernersTools\headeronly\Auto_Ptr.h"
 #include "..\..\..\WernersTools\headeronly\is_.h"
+
+#include <vector>
+#include <deque>
+#include <set>
+#include <map>
+#include <unordered_map>
 
 static_assert( WS::is_dereferenceable_v<char const *> ) ;
 static_assert( WS::is_pointerable_v<char const *> ) ;
@@ -348,6 +355,126 @@ namespace UT_ReadWriteData
 
 			Assert::IsTrue( file.GetPosition() == written );
 			file.Seek(0,CFile::begin);
+		}
+		TEST_METHOD(UT_WriteDataReadData_vector)
+		{
+			CMemFile file;
+			using container_t = std::vector<int>;
+			container_t container1;
+
+			WriteData(file,container1);
+			auto container2 = container_t{1,3,5,2,4,6};
+			WriteData(file,container2);
+
+			auto written = file.GetPosition();
+			file.Seek(0,CFile::begin);
+
+			auto read = ReadData<container_t>(file);
+			Assert::IsTrue( read == container1 );
+			ReadData(file,read);
+			Assert::IsTrue( read == container2 );
+
+			Assert::IsTrue( file.GetPosition() == written );
+		}
+		TEST_METHOD(UT_WriteDataReadData_deque)
+		{
+			CMemFile file;
+			using container_t = std::deque<int>;
+			container_t container1;
+
+			WriteData(file,container1);
+			auto container2 = container_t{1,3,5,2,4,6};
+			WriteData(file,container2);
+
+			auto written = file.GetPosition();
+			file.Seek(0,CFile::begin);
+
+			auto read = ReadData<container_t>(file);
+			Assert::IsTrue( read == container1 );
+			ReadData(file,read);
+			Assert::IsTrue( read == container2 );
+
+			Assert::IsTrue( file.GetPosition() == written );
+		}
+		TEST_METHOD(UT_WriteDataReadData_set)
+		{
+			CMemFile file;
+			using container_t = std::set<int>;
+			container_t container1;
+
+			WriteData(file,container1);
+			auto container2 = container_t{1,3,5,2,4,6};
+			WriteData(file,container2);
+
+			auto written = file.GetPosition();
+			file.Seek(0,CFile::begin);
+
+			auto read = ReadData<container_t>(file);
+			Assert::IsTrue( read == container1 );
+			ReadData(file,read);
+			Assert::IsTrue( read == container2 );
+
+			Assert::IsTrue( file.GetPosition() == written );
+		}
+		TEST_METHOD(UT_WriteDataReadData_map)
+		{
+			CMemFile file;
+			using container_t = std::map<int,int>;
+			container_t container1;
+
+			WriteData(file,container1);
+			auto container2 = container_t{{1,1},{2,3},{3,5},{4,2},{5,4},{6,6}};
+			WriteData(file,container2);
+
+			auto written = file.GetPosition();
+			file.Seek(0,CFile::begin);
+
+			auto read = ReadData<container_t>(file);
+			Assert::IsTrue( read == container1 );
+			ReadData(file,read);
+			Assert::IsTrue( read == container2 );
+
+			Assert::IsTrue( file.GetPosition() == written );
+		}
+		TEST_METHOD(UT_WriteDataReadData_unorderdmap)
+		{
+			CMemFile file;
+			using container_t = std::unordered_map<int,int>;
+			container_t container1;
+
+			WriteData(file,container1);
+			auto container2 = container_t{{1,1},{2,3},{3,5},{4,2},{5,4},{6,6}};
+			WriteData(file,container2);
+
+			auto written = file.GetPosition();
+			file.Seek(0,CFile::begin);
+
+			auto read = ReadData<container_t>(file);
+			Assert::IsTrue( read == container1 );
+			ReadData(file,read);
+			Assert::IsTrue( read == container2 );
+
+			Assert::IsTrue( file.GetPosition() == written );
+		}
+		TEST_METHOD(UT_WriteDataReadData_multimap)
+		{
+			CMemFile file;
+			using container_t = std::multimap<int,int>;
+			container_t container1;
+
+			WriteData(file,container1);
+			auto container2 = container_t{{1,1},{1,3},{1,5},{2,2},{2,4},{2,6}};
+			WriteData(file,container2);
+
+			auto written = file.GetPosition();
+			file.Seek(0,CFile::begin);
+
+			auto read = ReadData<container_t>(file);
+			Assert::IsTrue( read == container1 );
+			ReadData(file,read);
+			Assert::IsTrue( read == container2 );
+
+			Assert::IsTrue( file.GetPosition() == written );
 		}
 	};
 }

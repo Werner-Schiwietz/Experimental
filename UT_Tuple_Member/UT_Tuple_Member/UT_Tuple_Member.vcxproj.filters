@@ -41,5 +41,11 @@
     <ClInclude Include="ReadWrite_char_t_array.h">
       <Filter>Source Files</Filter>
     </ClInclude>
+    <ClInclude Include="ReadWrite_container.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="tuple_struct.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

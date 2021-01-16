@@ -9,43 +9,12 @@ using namespace Microsoft::VisualStudio::CppUnitTestFramework;
 
 #include "ReadWrite_char_t.h"
 #include "ReadWrite_char_t_array.h"
+
+#include "tuple_struct.h"
+
 #include "derefernce.h"
 
 #include <afx.h>//CFile
-
-template<typename enum_type, typename ... types>
-struct struct_name
-{	
-	using typelist = WS::typelist<types...>;
-	using tuple_t = typename typelist::tuple_t;
-	using member = enum_type;
-	tuple_t values{};
-
-	template<member index> auto & operator()() &		{return std::get<index>(this->values);}				//operator() funktioniert, aber bringt für den aufrufer nichts, nur unverständnis. aufruf per v.[template ]operator()<0>(); [template ] optinal evtl. bei einigen compilern nötig
-	template<member index> auto   operator()()  &&		{return std::move(std::get<index>(this->values));}	//operator() funktioniert, aber bringt für den aufrufer nichts, nur unverständnis
-	template<member index> auto & access() &			{return std::get<index>(this->values);}
-	template<member index> auto   access() &&			{return std::move(std::get<index>(this->values));}
-
-	template<member index,typename T> struct_name& set(T&&value) &	
-	{
-		std::get<index>(this->values) = std::forward<T>(value);
-		return *this;
-	}
-	template<member index,typename T> struct_name set(T&&value) &&
-	{
-		std::get<index>(this->values) = std::forward<T>(value);
-		return std::move(*this);
-	}
-};
-
-template<typename io_interface, typename enum_type,typename ... types> void WriteData( io_interface && io, struct_name<enum_type,types...> const & value  )
-{
-	WriteData( std::forward<io_interface>(io), value.values );
-}
-template<typename io_interface, typename enum_type,typename ... types> void ReadData( io_interface && io, struct_name<enum_type,types...> & value  )
-{
-	ReadData( std::forward<io_interface>(io), value.values );
-}
 
 namespace enumNS
 {
@@ -89,7 +58,7 @@ namespace UT_TupleMember
 		TEST_METHOD(UT_struct_name_WriteData_ReadData)
 		{
 			enum member{type_name0,type_name1};
-			using s_type = struct_name<member,int,std::unique_ptr<char[]>>;
+			using s_type = tuple_struct<member,int,std::unique_ptr<char[]>>;
 			auto str2=std::unique_ptr<char[]>{_strdup("hallo")};
 			std::unique_ptr<char[]> str;
 			auto & rstr = str;
@@ -124,20 +93,20 @@ namespace UT_TupleMember
 		TEST_METHOD(TestMethod3)
 		{
 			enum member{type_name0,type_name1};
-			using s_type = struct_name<member,int,char const *>;
+			using s_type = tuple_struct<member,int,char const *>;
 			auto s = s_type{}.set<s_type::member::type_name0>(5).set<s_type::member::type_name1>("hallo");
-			Assert::IsTrue( s.operator()<s_type::member::type_name0>()==5);
-			Assert::IsTrue( s.template operator()<s_type::member::type_name0>()==5);
+			//Assert::IsTrue( s.operator()<s_type::member::type_name0>()==5);
+			//Assert::IsTrue( s.template operator()<s_type::member::type_name0>()==5);
 			Assert::IsTrue( s.template access<s_type::member::type_name0>()==5);
 			Assert::IsTrue( s.access<s_type::member::type_name0>()==5);
 			Assert::IsTrue( s.access<0>()==5);
 			//
-			Assert::IsTrue( strcmp(s.operator()<s_type::member::type_name1>(),"hallo")==0);
+			//Assert::IsTrue( strcmp(s.operator()<s_type::member::type_name1>(),"hallo")==0);
 			#pragma warning(suppress:4130)//warning C4130: '==': logical operation on address of string constant
-			Assert::IsTrue( s.operator()<s_type::member::type_name1>()=="hallo");
+			//Assert::IsTrue( s.operator()<s_type::member::type_name1>()=="hallo");
 			#pragma warning(suppress:4130)//warning C4130: '==': logical operation on address of string constant
-			Assert::IsTrue( s.template operator()<s_type::member::type_name1>()=="hallo");
-			//Assert::IsTrue( s.template <struct_name::type_name1>()=="hallo");
+			//Assert::IsTrue( s.template operator()<s_type::member::type_name1>()=="hallo");
+			//Assert::IsTrue( s.template <tuple_struct::type_name1>()=="hallo");
 		}
 		TEST_METHOD(TestMethod2)
 		{

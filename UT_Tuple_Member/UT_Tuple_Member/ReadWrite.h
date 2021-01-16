@@ -154,5 +154,20 @@ template<typename io_interface, typename ... types> void ReadData( io_interface 
 }
 #pragma endregion 
 
+#pragma region pair
+template<typename io_interface, typename first_t, typename second_t> void WriteData( io_interface && io, std::pair<first_t,second_t> const & value )
+{
+	WriteData( std::forward<io_interface>(io), value.first );
+	WriteData( std::forward<io_interface>(io), value.second );
+}
+template<typename io_interface, typename first_t, typename second_t> void ReadData( io_interface && io, std::pair<first_t,second_t> & value )
+{
+	value = 
+	{ 
+		ReadData<first_t>(  std::forward<io_interface>(io) ),
+		ReadData<second_t>( std::forward<io_interface>(io) )
+	};
+}
+#pragma endregion 
 
 

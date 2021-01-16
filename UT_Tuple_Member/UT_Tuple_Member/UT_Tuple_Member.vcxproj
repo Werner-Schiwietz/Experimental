@@ -175,6 +175,8 @@
     <ClInclude Include="ReadWriteInterfaceFuerCFile.h" />
     <ClInclude Include="ReadWrite_char_t.h" />
     <ClInclude Include="ReadWrite_char_t_array.h" />
+    <ClInclude Include="ReadWrite_container.h" />
+    <ClInclude Include="tuple_struct.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
