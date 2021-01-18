@@ -77,20 +77,64 @@ void WriteData( CFile* pFile, A const & value )
 	WriteData(pFile,value.v6);
 }
 
+template<typename T> struct _adder
+{
+	using type=T;
+	T value{};
+	_adder(){}
+	_adder( T const & v):value(v){}
+	T add(T const & r){return this->value += r;}
+	operator T() const {return value;}
+};
+template<> struct _adder<void>
+{
+	using type=void;
+	_adder( void ){}
+	void add( void ){}
+	//void add( int={} ){}
+	//template<typename ... Ts> void add(Ts...ps){}
+	operator void() const {return;}
+};
+
+
 namespace UT_ReadWriteData
 {
+	TEST_CLASS(UT_Verstaendnis)
+	{
+		TEST_METHOD(AddVoidReturnType)
+		{
+			auto return_void = []()->void{};
+			auto return_in_type = [](auto value){ return value;};
+				
+			{
+				auto v1 = _adder<decltype(return_in_type(5))>{};
+				auto v2 = _adder{return_in_type(5)};//ctor bestimmt T
+				v1.add( return_in_type(5) );
+				v1.add( return_in_type(6) );
+				v2.add( return_in_type(6) );
+				Assert::IsTrue( v1==v2 );
+			}
+			{
+				auto v = _adder<void>{};
+				auto v1 = _adder<decltype(return_void())>{};
+				//auto v2 = _adder{return_void()};//ctor bestimmt T. geht nicht mit void
+				//v1.add( return_void() );//funktioniert nicht mit funktionen mit return_type void 
+				//v1.add( return_void() );
+			}
+		}
+	};
 	TEST_CLASS(UT_ReadWriteData)
 	{
 	public:
 		TEST_METHOD(UT_WriteDataReadData)
 		{
 			CMemFile file;
-			auto source_inteface	= ReadWrite_CFile(file);
-			auto dest_inteface		= ReadWrite_CFile(file);
+			auto source_interface	= ReadWrite_CFile(file);
+			auto dest_interface		= ReadWrite_CFile(file);
 
 			WriteData( dynamic_cast<CFile&>(file), 5i32 );
 			WriteData( file, 6i16 );
-			WriteData( dest_inteface, 7i64 );
+			WriteData( dest_interface, 7i64 );
 
 			WriteData( file, (char *)nullptr);
 			WriteData( file, (char const*)"hallo");
@@ -115,7 +159,7 @@ namespace UT_ReadWriteData
 			file.Seek(0,CFile::begin);
 
 			Assert::IsTrue( ReadData<__int32>( file ) == 5 );
-			__int16 value;ReadData( source_inteface, value );Assert::IsTrue( value==6 );
+			__int16 value;ReadData( source_interface, value );Assert::IsTrue( value==6 );
 			Assert::IsTrue( ReadData<__int64>( dynamic_cast<CFile&>(file) ) == 7 );
 			std::unique_ptr<char[]> text{ ReadData<char*>( file ) };
 			Assert::IsTrue( text == nullptr );
@@ -147,7 +191,31 @@ namespace UT_ReadWriteData
 
 			Assert::IsTrue( file.GetPosition() == written );
 		}
+		TEST_METHOD(UT_WriteDataReadData_exception)
+		{
+			CMemFile file;
+			CFile* pFile = &file;
 
+			auto value = 0x0102030405060708i64;
+			WriteData( file, value );
+
+			file.Seek(0,CFile::begin);
+
+			ReadData( file, value );
+			try
+			{
+				ReadData( pFile, value );
+				Assert::Fail(L"exception erwartet");
+			}
+			catch(std::exception & e )
+			{
+				Logger::WriteMessage(typeid(e).name());
+				auto p { e.what() };
+				Logger::WriteMessage(p);
+			}
+
+
+		}
 		TEST_METHOD(UT_WriteDataReadData_int64)
 		{
 			CMemFile file;

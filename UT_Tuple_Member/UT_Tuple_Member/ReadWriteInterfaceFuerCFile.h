@@ -14,17 +14,17 @@
 
 #include <afx.h>//CFile
 
-struct ReadWrite_CFile : Idata_input, Idata_output
+struct ReadWrite_CFile : Idata_input<UINT>, Idata_output<void>
 {
 	CFile & File;
 	ReadWrite_CFile(CFile & File) : File(File){}
 
-	virtual void ReadData( void* p,size_t bytes) override
+	virtual UINT Read( void* p,size_t bytes) override
 	{
-		File.Read( p,bytes );
+		return File.Read( p,bytes );
 	}
-	virtual void WriteData( void const * p,size_t bytes) override
+	virtual void Write( void const * p,size_t bytes) override
 	{
-		File.Write( p,bytes );
+		return File.Write( p,bytes );
 	}
 };

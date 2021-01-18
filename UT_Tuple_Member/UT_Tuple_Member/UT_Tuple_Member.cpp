@@ -57,8 +57,8 @@ namespace UT_TupleMember
 		}
 		TEST_METHOD(UT_struct_name_WriteData_ReadData)
 		{
-			enum member{type_name0,type_name1};
-			using s_type = tuple_struct<member,int,std::unique_ptr<char[]>>;
+			enum names{type_name0,type_name1};
+			using s_type = tuple_struct<names,int,std::unique_ptr<char[]>>;
 			auto str2=std::unique_ptr<char[]>{_strdup("hallo")};
 			std::unique_ptr<char[]> str;
 			auto & rstr = str;

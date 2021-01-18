@@ -13,30 +13,35 @@
 #include <memory>
 
 #pragma region interface-vorlagen fuer ReadData WriteData
-struct Idata_output
+template<typename return_type> struct Idata_output
 {
 	virtual ~Idata_output(){}
-	virtual void WriteData( void const *,size_t bytes) = 0;
+	virtual return_type Write( void const *,size_t bytes) = 0;
 };
-struct Idata_input
+template<typename return_type> struct Idata_input
 {
 	virtual ~Idata_input(){}
-	virtual void ReadData( void *,size_t bytes) = 0;
+	virtual return_type Read( void *,size_t bytes) = 0;
 };
 #pragma endregion
 
 #pragma region lowlevel ReadWrite
-template<typename io_interface>auto ReadData( io_interface && io, void * value, size_t bytes ) -> decltype( std::forward<io_interface>(io).ReadData( value, bytes ) )
+template<typename io_interface>auto ReadData( io_interface && io, void * value, size_t bytes ) -> decltype( std::forward<io_interface>(io).Read( value, bytes ) )
 {
-	return std::forward<io_interface>(io).ReadData( value, bytes );
+	if constexpr ( std::is_integral_v<decltype( std::forward<io_interface>(io).Read( value, bytes ) )> )
+	{
+		struct ReadData_data_missing : std::exception{using std::exception::exception;};
+		auto read = std::forward<io_interface>(io).Read( value, bytes );
+		if( read != bytes )
+			throw ReadData_data_missing{ __FUNCTION__ " zu wenig Daten gelesen" };
+		return read;
+	}
+	else
+		return std::forward<io_interface>(io).Read( value, bytes );
 }
-template<typename io_interface> auto ReadData( io_interface && io, void* value, size_t bytes ) -> decltype( std::forward<io_interface>(io).Read(value,bytes) )
+template<typename io_interface> auto ReadData( io_interface && io, void* value, size_t bytes ) -> decltype( ReadData( (*std::forward<io_interface>(io)),value,bytes) )
 {
-	return std::forward<io_interface>(io).Read( value, bytes );
-}
-template<typename io_interface> auto ReadData( io_interface && io, void* value, size_t bytes ) -> decltype( std::forward<io_interface>(io)->Read(value,bytes) )
-{
-	return std::forward<io_interface>(io)->Read( value, bytes );
+	return ReadData( (*std::forward<io_interface>(io)),value,bytes);
 }
 
 template<typename io_interface>auto WriteData( io_interface && io, void const * value, size_t bytes ) -> decltype( std::forward<io_interface>(io).WriteData((void const*)nullptr,(size_t)0) )
