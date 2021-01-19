@@ -47,5 +47,8 @@
     <ClInclude Include="tuple_struct.h">
       <Filter>Source Files</Filter>
     </ClInclude>
+    <ClInclude Include="ReadWriteInterfaceFuerStreams.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

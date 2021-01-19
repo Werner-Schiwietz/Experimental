@@ -7,6 +7,7 @@ using namespace Microsoft::VisualStudio::CppUnitTestFramework;
 #include "ReadWrite_char_t_array.h"
 #include "ReadWrite_container.h"
 #include "ReadWriteInterfaceFuerCFile.h"
+#include "ReadWriteInterfaceFuerStreams.h"
 #include "derefernce.h"
 
 #include "..\..\..\WernersTools\headeronly\Auto_Ptr.h"
@@ -76,6 +77,58 @@ void WriteData( CFile* pFile, A const & value )
 	WriteData(pFile,value.v5);
 	WriteData(pFile,value.v6);
 }
+void ReadData( Read_Stream istream, A & value )
+{
+	ReadData(istream,value.v1);
+	ReadData(istream,value.v2);
+	ReadData(istream,value.v3);
+	ReadData(istream,value.v4);
+	ReadData(istream,value.v5);
+	ReadData(istream,value.v6);
+}
+void WriteData( Write_Stream ostream,  A const & value )
+{
+	WriteData(ostream,value.v1);
+	WriteData(ostream,value.v2);
+	WriteData(ostream,value.v3);
+	WriteData(ostream,value.v4);
+	WriteData(ostream,value.v5);
+	WriteData(ostream,value.v6);
+}
+
+struct IMemBuf: std::streambuf
+{
+	IMemBuf(const char* base, size_t size)
+	{
+		char* p(const_cast<char*>(base));
+		this->setg(p, p, p + size);
+	}
+};
+
+struct IMemStream: virtual IMemBuf, std::istream
+{
+	IMemStream(const char* mem, size_t size) :
+		IMemBuf(mem, size),
+		std::istream(static_cast<std::streambuf*>(this))
+	{
+	}
+};
+
+struct OMemBuf: std::streambuf
+{
+	OMemBuf(char* base, size_t size)
+	{
+		this->setp(base, base + size);
+	}
+};
+struct OMemStream: virtual OMemBuf, std::ostream
+{
+	OMemStream(char* mem, size_t size) :
+		OMemBuf(mem, size),
+		std::ostream(static_cast<std::streambuf*>(this))
+	{
+	}
+};
 
 template<typename T> struct _adder
 {
@@ -395,6 +448,27 @@ namespace UT_ReadWriteData
 
 			Assert::IsTrue( file.GetPosition() == written );
 			file.Seek(0,CFile::begin);
+		}
+		TEST_METHOD(UT_WriteDataReadData_struct_stream)
+		{
+			char buf[1000]{};
+
+			OMemStream out(buf,_countof(buf));
+			IMemStream in(buf,_countof(buf));
+
+			A value{
+				5
+				,6
+				,std::unique_ptr<char[]>{_strdup("hallo")}
+			,std::unique_ptr<wchar_t[]>{_wcsdup(L"welt")}
+			,std::make_unique<unsigned short>(5ui16) };
+
+			WriteData( Write_Stream(out), value );//nullptr
+
+			A valueRead;
+
+			ReadData(Read_Stream(in), valueRead);
+			Assert::IsTrue( valueRead==value );
 		}
 		TEST_METHOD(UT_WriteDataReadData_struct_als_unique_ptr)
 		{

@@ -173,6 +173,7 @@
     <ClInclude Include="pch.h" />
     <ClInclude Include="ReadWrite.h" />
     <ClInclude Include="ReadWriteInterfaceFuerCFile.h" />
+    <ClInclude Include="ReadWriteInterfaceFuerStreams.h" />
     <ClInclude Include="ReadWrite_char_t.h" />
     <ClInclude Include="ReadWrite_char_t_array.h" />
     <ClInclude Include="ReadWrite_container.h" />
