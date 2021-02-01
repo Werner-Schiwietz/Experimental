@@ -26,6 +26,16 @@ template<typename return_type> struct Idata_input
 #pragma endregion
 
 #pragma region lowlevel ReadWrite
+//SFINAE: Substitution Failure Is Not An Error
+template <typename T, typename io_interface> auto hasmethod_ReadData(unsigned long) -> std::false_type;
+template <typename T, typename io_interface> auto hasmethod_ReadData(int) -> decltype( std::declval<T>().ReadData(std::declval<io_interface>()), std::true_type{} );
+template <typename T, typename io_interface> auto hasmethod_WriteData(unsigned long) -> std::false_type;
+template <typename T, typename io_interface> auto hasmethod_WriteData(int) -> decltype( std::declval<T>().WriteData(std::declval<io_interface>()), std::true_type{} );
+template <typename T, typename io_interface> auto hasmethod_Load(unsigned long) -> std::false_type;
+template <typename T, typename io_interface> auto hasmethod_Load(int) -> decltype( std::declval<T>().Load(std::declval<io_interface>()), std::true_type{} );
+template <typename T, typename io_interface> auto hasmethod_Save(unsigned long) -> std::false_type;
+template <typename T, typename io_interface> auto hasmethod_Save(int) -> decltype( std::declval<T>().Save(std::declval<io_interface>()), std::true_type{} );
+
 template<typename io_interface>auto ReadData( io_interface && io, void * value, size_t bytes ) -> decltype( std::forward<io_interface>(io).Read( value, bytes ) )
 {
 	if constexpr ( std::is_integral_v<decltype( std::forward<io_interface>(io).Read( value, bytes ) )> )
@@ -61,15 +71,37 @@ template<typename io_interface>auto WriteData( io_interface && io, void const * 
 
 template<typename io_interface, typename T>	auto ReadData( io_interface && io, T & value  )
 {
-	static_assert( std::is_pointer_v<T> == false );
-	return ReadData( std::forward<io_interface>(io), (void*)&value, sizeof(value) );
+	if constexpr ( decltype(hasmethod_ReadData<T,io_interface&&>(0))::value )
+	{
+		return value.ReadData( std::forward<io_interface>( io ) );
+	}
+	else if constexpr ( decltype(hasmethod_Load<T,io_interface&&>(0))::value )
+	{
+		return value.Load( std::forward<io_interface>( io ) );
+	}
+	else
+	{
+		static_assert(std::is_pointer_v<T> == false);
+		return ReadData( std::forward<io_interface>( io ), (void *)&value, sizeof( value ) );
+	}
 }
 template<typename T,typename io_interface>	T ReadData( io_interface && io ){T value{}; ReadData(std::forward<io_interface>(io),value); return value;}
 
 template<typename io_interface, typename T> auto WriteData( io_interface && io, T const & value  )
 {
-	static_assert( std::is_pointer_v<T> == false );
-	return WriteData( std::forward<io_interface>(io), (void const *)&value, sizeof(value) );
+	if constexpr ( decltype(hasmethod_WriteData<T const,io_interface&&>(0))::value )
+	{
+		return value.WriteData( std::forward<io_interface>( io ) );
+	}
+	else if constexpr ( decltype(hasmethod_Save<T const,io_interface&&>(0))::value )
+	{
+		return value.Save( std::forward<io_interface>( io ) );
+	}
+	else
+	{
+		static_assert(std::is_pointer_v<T> == false);
+		return WriteData( std::forward<io_interface>( io ), (void const *)&value, sizeof( value ) );
+	}
 }
 
 #pragma region variadic 

@@ -54,28 +54,32 @@ struct A
 			&& dereferenced::equal(this->v5,r.v5)
 			&& dereferenced::equal(this->v6,r.v6);
 	}
+	void Load( CFile* pFile)
+	{
+		ReadData(pFile,(*this).v1);
+		ReadData(pFile,(*this).v2);
+		ReadData(pFile,(*this).v3);
+		ReadData(pFile,(*this).v4);
+		ReadData(pFile,(*this).v5);
+		ReadData(pFile,(*this).v6);
+	}
+	void Save( CFile* pFile ) const
+	{
+		WriteData(pFile,(*this).v1);
+		WriteData(pFile,(*this).v2);
+		WriteData(pFile,(*this).v3);
+		WriteData(pFile,(*this).v4);
+		WriteData(pFile,(*this).v5);
+		WriteData(pFile,(*this).v6);
+	}
 };
-void ReadData( CFile* pFile, A & value )
-{
-	ReadData(pFile,value.v1);
-	ReadData(pFile,value.v2);
-	ReadData(pFile,value.v3);
-	ReadData(pFile,value.v4);
-	ReadData(pFile,value.v5);
-	ReadData(pFile,value.v6);
-}
 void ReadData( ReadWrite_CFile&& io, A & value )//weil in UT_WriteDataReadData_struct_als_unique_ptr ReadData(ReadWrite_CFile(file), valueRead); statt ReadData(pFile, valueRead) steht
 {
 	ReadData( &io.File, value );
 }
-void WriteData( CFile* pFile, A const & value )
+void WriteData( ReadWrite_CFile&& io, A const & value )
 {
-	WriteData(pFile,value.v1);
-	WriteData(pFile,value.v2);
-	WriteData(pFile,value.v3);
-	WriteData(pFile,value.v4);
-	WriteData(pFile,value.v5);
-	WriteData(pFile,value.v6);
+	WriteData( &io.File, value );
 }
 void ReadData( Read_Stream istream, A & value )
 {
@@ -95,6 +99,8 @@ void WriteData( Write_Stream ostream,  A const & value )
 	WriteData(ostream,value.v5);
 	WriteData(ostream,value.v6);
 }
+static_assert( decltype(hasmethod_Load<A,CFile*>(0))::value );
+static_assert( decltype(hasmethod_Save<A const,CFile*>(0))::value );
 
 struct IMemBuf: std::streambuf
 {
