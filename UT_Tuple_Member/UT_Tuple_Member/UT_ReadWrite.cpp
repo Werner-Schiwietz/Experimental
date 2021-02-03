@@ -44,7 +44,6 @@ struct A
 
 	static_assert( WS::is_dereferenceable_v<std::unique_ptr<wchar_t>> );
 	//static_assert( WS::is_dereferenceable_v<std::unique_ptr<wchar_t[]>> );
-
 	bool operator==(A const & r) const
 	{
 		return this->v1 == r.v1
@@ -53,6 +52,19 @@ struct A
 			&& dereferenced::equal(this->v4,r.v4 )//, equal_0_terminiert<wchar_t> )//geht auch automatisch
 			&& dereferenced::equal(this->v5,r.v5)
 			&& dereferenced::equal(this->v6,r.v6);
+	}
+	A()=default;
+	A( int v1, short v2, std::unique_ptr<char[]> v3, std::unique_ptr<wchar_t[]>	v4, std::unique_ptr<unsigned short> v5 )
+		: v1(v1)
+		, v2(v2)
+		, v3(std::move(v3))
+		, v4(std::move(v4))
+		, v5(std::move(v5)) 
+	{}
+
+	A( CFile* pFile)
+	{
+		Load(pFile);
 	}
 	void Load( CFile* pFile)
 	{
@@ -492,13 +504,20 @@ namespace UT_ReadWriteData
 										   };
 			WriteData( ReadWrite_CFile(file), decltype(value){}  );//nullptr
 			WriteData( pFile, value );
+			WriteData( pFile, *value );
+			WriteData( pFile, value );
 
 			auto written = file.GetPosition();
 			file.Seek(0,CFile::begin);
 
+			static_assert( decltype(has_Load_ctor<A,CFile*>(0))::value );
 			auto valueRead = ReadData<decltype(value)>(pFile);
 			Assert::IsTrue( valueRead==nullptr );
 			ReadData(ReadWrite_CFile(file), valueRead);
+			Assert::IsTrue( dereferenced::equal(valueRead,value) );
+			auto valueRead2  = ReadData<A>( &file );
+			Assert::IsTrue( valueRead2 == *value );
+			ReadData(&file, valueRead);
 			Assert::IsTrue( dereferenced::equal(valueRead,value) );
 
 			Assert::IsTrue( file.GetPosition() == written );

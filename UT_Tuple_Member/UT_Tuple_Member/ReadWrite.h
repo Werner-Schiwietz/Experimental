@@ -36,6 +36,11 @@ template <typename T, typename io_interface> auto hasmethod_Load(int) -> decltyp
 template <typename T, typename io_interface> auto hasmethod_Save(unsigned long) -> std::false_type;
 template <typename T, typename io_interface> auto hasmethod_Save(int) -> decltype( std::declval<T>().Save(std::declval<io_interface>()), std::true_type{} );
 
+template <typename T, typename io_interface> auto has_Load_ctor(unsigned long) -> std::false_type;
+template <typename T, typename io_interface> auto has_Load_ctor(int) -> decltype( T{std::declval<io_interface>()}, std::true_type{} );
+
+
+
 template<typename io_interface>auto ReadData( io_interface && io, void * value, size_t bytes ) -> decltype( std::forward<io_interface>(io).Read( value, bytes ) )
 {
 	if constexpr ( std::is_integral_v<decltype( std::forward<io_interface>(io).Read( value, bytes ) )> )
@@ -81,11 +86,24 @@ template<typename io_interface, typename T>	auto ReadData( io_interface && io, T
 	}
 	else
 	{
-		static_assert(std::is_pointer_v<T> == false);
+		static_assert(decltype(has_Load_ctor<T,io_interface&&>(0))::value == false, "use ReadData<T>(io)" );
+		static_assert(std::is_pointer_v<T> == false, "is pointer!!. saving address???");
 		return ReadData( std::forward<io_interface>( io ), (void *)&value, sizeof( value ) );
 	}
 }
-template<typename T,typename io_interface>	T ReadData( io_interface && io ){T value{}; ReadData(std::forward<io_interface>(io),value); return value;}
+template<typename T,typename io_interface>	T ReadData( io_interface && io )
+{
+	if constexpr ( decltype(hasmethod_Load<T,io_interface&&>(0))::value )
+	{
+		return T{std::forward<io_interface>( io )};
+	}
+	else
+	{
+		T value{};
+		ReadData( std::forward<io_interface>( io ), value );
+		return value;
+	}
+}
 
 template<typename io_interface, typename T> auto WriteData( io_interface && io, T const & value  )
 {
@@ -138,8 +156,15 @@ template<typename io_interface, typename T>	void ReadData( io_interface && io, s
 
 	if( ReadData<bool>(std::forward<io_interface>(io)) )
 	{
-		value = std::make_unique<T>();
-		(void)ReadData( std::forward<io_interface>(io), *value );
+		if constexpr ( decltype(has_Load_ctor<T,io_interface&&>(0))::value )
+		{
+			value = std::make_unique<T>( std::forward<io_interface>( io ) );
+		}
+		else
+		{
+			value = std::make_unique<T>();
+			(void)ReadData( std::forward<io_interface>( io ), *value );
+		}
 	}
 }
 template<typename io_interface, typename T>	void WriteData( io_interface && io, std::shared_ptr<T> const & value )
