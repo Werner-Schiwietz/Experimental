@@ -25,14 +25,24 @@ struct tuple_struct
 		std::get<index>(this->values) = std::forward<T>(value);
 		return std::move(*this);
 	}
+
+	template<typename io_interface> void WriteData( io_interface && io ) const
+	{
+		::WriteData( std::forward<io_interface>(io), this->values );
+	}
+	template<typename io_interface> void ReadData( io_interface && io )
+	{
+		::ReadData( std::forward<io_interface>(io), this->values );
+	}
 };
-template<typename io_interface, typename enum_type,typename ... types> void WriteData( io_interface && io, tuple_struct<enum_type,types...> const & value  )
-{
-	WriteData( std::forward<io_interface>(io), value.values );
-}
-template<typename io_interface, typename enum_type,typename ... types> void ReadData( io_interface && io, tuple_struct<enum_type,types...> & value  )
-{
-	ReadData( std::forward<io_interface>(io), value.values );
-}
+
+//template<typename io_interface, typename enum_type,typename ... types> void WriteData( io_interface && io, tuple_struct<enum_type,types...> const & value  )
+//{
+//	WriteData( std::forward<io_interface>(io), value.values );
+//}
+//template<typename io_interface, typename enum_type,typename ... types> void ReadData( io_interface && io, tuple_struct<enum_type,types...> & value  )
+//{
+//	ReadData( std::forward<io_interface>(io), value.values );
+//}
 
 
