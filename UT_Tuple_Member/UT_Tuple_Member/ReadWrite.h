@@ -12,6 +12,13 @@
 
 #include <memory>
 
+namespace WS
+{
+	// FUNCTION TEMPLATE declval
+	template <class _Ty> std::add_lvalue_reference_t<_Ty> decllval() noexcept;
+	template <class _Ty> std::add_rvalue_reference_t<_Ty> declrval() noexcept;
+}
+
 #pragma region interface-vorlagen fuer ReadData WriteData
 template<typename return_type> struct Idata_output
 {
@@ -26,7 +33,30 @@ template<typename return_type> struct Idata_input
 #pragma endregion
 
 #pragma region lowlevel ReadWrite
-template<typename io_interface>auto ReadData( io_interface && io, void * value, size_t bytes ) -> decltype( std::forward<io_interface>(io).Read( value, bytes ) )
+//SFINAE: Substitution Failure Is Not An Error
+template<typename T, typename io=CFile*, typename ... param_ts> auto HasMethod_ReadData(unsigned long) -> std::false_type;
+template<typename T, typename io=CFile*, typename ... param_ts> auto HasMethod_ReadData(int) -> decltype(WS::decllval<T>().ReadData(WS::decllval<io>(),WS::decllval<param_ts>()...) , std::true_type{});
+template<typename T, typename io=CFile*, typename ... param_ts> static bool constexpr HasMethod_ReadData_v = decltype(HasMethod_ReadData<T,io,param_ts...>(0))::value;
+
+template<typename T, typename io=CFile*> auto HasMethod_WriteData(unsigned long) -> std::false_type;
+template<typename T, typename io=CFile*> auto HasMethod_WriteData(int) -> decltype(WS::decllval<T>().WriteData(WS::decllval<io>()) , std::true_type{});
+template<typename T, typename io=CFile*> static bool constexpr HasMethod_WriteData_v = decltype(HasMethod_WriteData<T,io>(0))::value;
+
+template<typename T, typename io=CFile*, typename ... param_ts> auto HasMethod_Load(unsigned long) -> std::false_type;
+template<typename T, typename io=CFile*, typename ... param_ts> auto HasMethod_Load(int) -> decltype(WS::decllval<T>().Load(WS::decllval<io>(),WS::decllval<param_ts>()...) , std::true_type{});
+template<typename T, typename io=CFile*, typename ... param_ts> static bool constexpr HasMethod_Load_v = decltype(HasMethod_Load<T,io,param_ts...>(0))::value;
+
+template<typename T, typename io=CFile*> auto HasMethod_Save(unsigned long) -> std::false_type;
+template<typename T, typename io=CFile*> auto HasMethod_Save(int) -> decltype(WS::decllval<T>().Save(WS::decllval<io>()) , std::true_type{});
+template<typename T, typename io=CFile*> static bool constexpr HasMethod_Save_v = decltype(HasMethod_Save<T,io>(0))::value;
+
+
+template<typename T, typename io=CFile*, typename ... param_ts> auto Has_Load_ctor(unsigned long) -> std::false_type;
+template<typename T, typename io=CFile*, typename ... param_ts> auto Has_Load_ctor(int) -> decltype( T{WS::decllval<io>(),WS::decllval<param_ts>()...},std::bool_constant< std::is_constructible<T,io,param_ts...>::value && !std::is_trivially_constructible<T,io,param_ts...>::value>{});
+template<typename T, typename io=CFile*, typename ... param_ts> static bool constexpr Has_Load_ctor_v = decltype(Has_Load_ctor<T,io,param_ts...>(0))::value;
+
+
+template<typename io_interface>auto _ReadData( io_interface && io, void * value, size_t bytes ) -> decltype( std::forward<io_interface>(io).Read( value, bytes ) )
 {
 	if constexpr ( std::is_integral_v<decltype( std::forward<io_interface>(io).Read( value, bytes ) )> )
 	{
@@ -39,37 +69,75 @@ template<typename io_interface>auto ReadData( io_interface && io, void * value, 
 	else
 		return std::forward<io_interface>(io).Read( value, bytes );
 }
-template<typename io_interface> auto ReadData( io_interface && io, void* value, size_t bytes ) -> decltype( ReadData( (*std::forward<io_interface>(io)),value,bytes) )
+template<typename io_interface> auto _ReadData( io_interface && io, void* value, size_t bytes ) -> decltype( _ReadData( (*std::forward<io_interface>(io)),value,bytes) )
 {
-	return ReadData( (*std::forward<io_interface>(io)),value,bytes);
+	return _ReadData( (*std::forward<io_interface>(io)),value,bytes);
 }
 
-template<typename io_interface>auto WriteData( io_interface && io, void const * value, size_t bytes ) -> decltype( std::forward<io_interface>(io).WriteData((void const*)nullptr,(size_t)0) )
+template<typename io_interface>auto _WriteData( io_interface && io, void const * value, size_t bytes ) -> decltype( std::forward<io_interface>(io).WriteData((void const*)nullptr,(size_t)0) )
 {
 	return std::forward<io_interface>(io).WriteData( value, bytes );
 }
-template<typename io_interface>auto WriteData( io_interface && io, void const * value, size_t bytes ) -> decltype( std::forward<io_interface>(io).Write(value, bytes) )
+template<typename io_interface>auto _WriteData( io_interface && io, void const * value, size_t bytes ) -> decltype( std::forward<io_interface>(io).Write(value, bytes) )
 {
 	return std::forward<io_interface>(io).Write( value, bytes );
 }
-template<typename io_interface>auto WriteData( io_interface && io, void const * value, size_t bytes ) -> decltype( std::forward<io_interface>(io)->Write(value, bytes) )
+template<typename io_interface>auto _WriteData( io_interface && io, void const * value, size_t bytes ) -> decltype( std::forward<io_interface>(io)->Write(value, bytes) )
 {
 	return std::forward<io_interface>(io)->Write( value, bytes );
 }
 
 #pragma endregion
 
-template<typename io_interface, typename T>	auto ReadData( io_interface && io, T & value  )
+template<typename io_interface, typename T, typename ... param_ts>	auto ReadData( io_interface && io, T & value, param_ts && ... params  )
 {
-	static_assert( std::is_pointer_v<T> == false );
-	return ReadData( std::forward<io_interface>(io), (void*)&value, sizeof(value) );
+	if constexpr ( HasMethod_ReadData_v<T,io_interface&&,param_ts&&...> )
+	{
+		return value.ReadData( std::forward<io_interface>( std::forward<io_interface>(io), std::forward<param_ts>(params)... ) );
+	}
+	else if constexpr ( HasMethod_Load_v<T,io_interface&&,param_ts&&...> )
+	{
+		return value.Load( std::forward<io_interface>(io), std::forward<param_ts>(params)... );
+	}
+	else
+	{
+		static_assert(std::is_pointer_v<T> == false,"pointer speicher ich nicht");
+		static_assert(Has_Load_ctor_v<T,io_interface &&,param_ts&&...> == false,"bitte ReadData<T> aufrufen");
+		static_assert(sizeof...(param_ts)==0,"keine verwendung fuer die parameter");
+		return _ReadData( std::forward<io_interface>( io ), (void *)&value, sizeof( value ) );
+	}
 }
-template<typename T,typename io_interface>	T ReadData( io_interface && io ){T value{}; ReadData(std::forward<io_interface>(io),value); return value;}
+template<typename T,typename io_interface,typename ... param_ts>	T ReadData( io_interface && io, param_ts && ... params )
+{
+	if constexpr ( Has_Load_ctor_v<T,io_interface &&,param_ts && ...> )
+	{
+		return T(std::forward<io_interface>( io ), std::forward<param_ts>(params)... );
+	}
+	else
+	{
+		T value{};
+		ReadData( std::forward<io_interface>( io ), value, std::forward<param_ts>(params)... );
+		return value;
+	}
+}
 
 template<typename io_interface, typename T> auto WriteData( io_interface && io, T const & value  )
 {
-	static_assert( std::is_pointer_v<T> == false );
-	return WriteData( std::forward<io_interface>(io), (void const *)&value, sizeof(value) );
+	if constexpr ( HasMethod_WriteData_v<T const,io_interface&&> )
+	{
+		return value.WriteData( std::forward<io_interface>( io ) );
+	}
+	else if constexpr ( HasMethod_Save_v<T const,io_interface&&> )
+	{
+		return value.Save( std::forward<io_interface>( io ) );
+	}
+	else
+	{
+		static_assert(std::is_pointer_v<T> == false);
+		static_assert(HasMethod_WriteData_v<T ,io_interface&&> == false,"T::WriteData ist nicht const");
+		static_assert(HasMethod_Save_v<T ,io_interface&&> == false,"T::Save ist nicht const");
+		return _WriteData( std::forward<io_interface>( io ), (void const *)&value, sizeof( value ) );
+	}
 }
 
 #pragma region variadic 
@@ -106,8 +174,15 @@ template<typename io_interface, typename T>	void ReadData( io_interface && io, s
 
 	if( ReadData<bool>(std::forward<io_interface>(io)) )
 	{
-		value = std::make_unique<T>();
-		(void)ReadData( std::forward<io_interface>(io), *value );
+		if constexpr (Has_Load_ctor_v<T,io_interface &&> )
+		{
+			value = std::make_unique<T>(std::forward<io_interface>( io ));
+		}
+		else
+		{
+			value = std::make_unique<T>();
+			(void)ReadData( std::forward<io_interface>( io ), *value );
+		}
 	}
 }
 template<typename io_interface, typename T>	void WriteData( io_interface && io, std::shared_ptr<T> const & value )

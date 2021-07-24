@@ -32,7 +32,115 @@ static_assert( WS::is_pointerable<std::unique_ptr<char []>>::value==false ) ;
 //std::remove_reference_t<decltype( *(std::unique_ptr<char []>{}) )> x2;
 //std::remove_reference_t<decltype( std::unique_ptr<char []>{}.get() )> x3;
 
+struct xxx
+{
+	xxx(){}
+	xxx(CFile*);
+};
+template<typename T>
+struct try_ctor 
+{
+	//friend T::T();
+	friend xxx::xxx();
+};
 
+struct bool_ctor
+{
+	short i{5};
+	bool_ctor(bool){}
+};
+struct load_ctor
+{
+	short i{5};
+	load_ctor(){}
+	load_ctor(short i):i(i){}
+	load_ctor(CFile*pFile) : i( ReadData<short>(pFile) )
+	{		
+	}
+	load_ctor(CFile*pFile,int param1,std::string const &param2) : i( ReadData<short>(pFile) )
+	{		
+		param1;param2;
+	}
+	template<typename io_interface> void Save( io_interface&& io ) const
+	{
+		WriteData( std::forward<io_interface>(io), this->i );
+	}
+};
+struct load_bool_ctor
+{
+	short i{5};
+	load_bool_ctor(short i):i(i){}
+	load_bool_ctor(bool) 
+	{		
+	}
+	load_bool_ctor(CFile*pFile) : i( ReadData<short>(pFile) )
+	{		
+	}
+	template<typename io_interface> void Save( io_interface&& io ) const
+	{
+		WriteData( std::forward<io_interface>(io), this->i );
+	}
+};
+struct load_ctor_with_params
+{
+	short i{5};
+	mutable int const * ptr;
+	load_ctor_with_params(){};
+	load_ctor_with_params(short i):i(i){}
+	load_ctor_with_params(bool) 
+	{		
+	}
+	load_ctor_with_params(CFile*pFile) 
+		: i( ReadData<short>(pFile) )
+	{	
+	}
+	load_ctor_with_params(CFile*pFile,int) 
+		: i( ReadData<short>(pFile) )
+	{	
+	}
+	load_ctor_with_params(CFile* pFile,std::unique_ptr<int> && ptr) 
+		: i( ReadData<short>(pFile) )
+		, ptr(ptr.get())
+	{	
+	}
+	load_ctor_with_params(CFile* pFile,std::unique_ptr<int> & ptr) 
+		: i( ReadData<short>(pFile) )
+		, ptr(ptr.get())
+	{	
+	}
+	template<typename io_interface> void Save( io_interface&& io ) const
+	{
+		WriteData( std::forward<io_interface>(io), this->i );
+	}
+};
+struct load_with_params
+{
+	short i{5};
+	mutable int const * ptr;
+	load_with_params(){};
+	load_with_params(short i):i(i){}
+	load_with_params(bool) 
+	{		
+	}
+	void Load(CFile*pFile) 
+	{	
+		 i = ReadData<short>(pFile);
+	}
+	void Load(CFile* pFile,std::unique_ptr<int> && ptrin) 
+	{	
+		this->i = ReadData<short>(pFile);
+		this->ptr = ptrin.get();
+	}
+	void Load(CFile* pFile,std::unique_ptr<int> & ptrin) 
+	{	
+		this->i = ReadData<short>(pFile);
+		this->ptr = ptrin.get();
+	}
+	template<typename io_interface> void Save( io_interface&& io ) const
+	{
+		WriteData( std::forward<io_interface>(io), this->i );
+	}
+};
 struct A
 {
 	int									v1	= 1;
@@ -54,28 +162,32 @@ struct A
 			&& dereferenced::equal(this->v5,r.v5)
 			&& dereferenced::equal(this->v6,r.v6);
 	}
+	void Load( CFile* pFile)
+	{
+		ReadData(pFile,(*this).v1);
+		ReadData(pFile,(*this).v2);
+		ReadData(pFile,(*this).v3);
+		ReadData(pFile,(*this).v4);
+		ReadData(pFile,(*this).v5);
+		ReadData(pFile,(*this).v6);
+	}
+	void Save( CFile* pFile ) const
+	{
+		WriteData(pFile,(*this).v1);
+		WriteData(pFile,(*this).v2);
+		WriteData(pFile,(*this).v3);
+		WriteData(pFile,(*this).v4);
+		WriteData(pFile,(*this).v5);
+		WriteData(pFile,(*this).v6);
+	}
 };
-void ReadData( CFile* pFile, A & value )
-{
-	ReadData(pFile,value.v1);
-	ReadData(pFile,value.v2);
-	ReadData(pFile,value.v3);
-	ReadData(pFile,value.v4);
-	ReadData(pFile,value.v5);
-	ReadData(pFile,value.v6);
-}
 void ReadData( ReadWrite_CFile&& io, A & value )//weil in UT_WriteDataReadData_struct_als_unique_ptr ReadData(ReadWrite_CFile(file), valueRead); statt ReadData(pFile, valueRead) steht
 {
 	ReadData( &io.File, value );
 }
-void WriteData( CFile* pFile, A const & value )
+void WriteData( ReadWrite_CFile&& io, A const & value )
 {
-	WriteData(pFile,value.v1);
-	WriteData(pFile,value.v2);
-	WriteData(pFile,value.v3);
-	WriteData(pFile,value.v4);
-	WriteData(pFile,value.v5);
-	WriteData(pFile,value.v6);
+	WriteData( &io.File, value );
 }
 void ReadData( Read_Stream istream, A & value )
 {
@@ -95,6 +207,8 @@ void WriteData( Write_Stream ostream,  A const & value )
 	WriteData(ostream,value.v5);
 	WriteData(ostream,value.v6);
 }
+static_assert( HasMethod_Load_v<A,CFile*> );
+static_assert( HasMethod_Save_v<A const,CFile*> );
 
 struct IMemBuf: std::streambuf
 {
@@ -195,7 +309,7 @@ namespace UT_ReadWriteData
 			WriteData( file, "hallo");//schreibt das array mit 5 zeichen ohne 0-terminierung, wenn ReadWrite_char_t_array.h includiert
 
 			WriteData( file, strlen("hallo"));
-			WriteData( file, "hallo", strlen("hallo") );//schreibt die zeichen bis zur 0-terminierung. 
+			_WriteData( file, "hallo", strlen("hallo") );//schreibt die zeichen bis zur 0-terminierung. 
 
 			wchar_t chararray5[5]{L'h',L'a',L'l',L'l',L'o'};//nicht 0-terminiert
 			WriteData( file, chararray5);//schreibt das array mit 5 zeichen
@@ -615,6 +729,67 @@ namespace UT_ReadWriteData
 			Assert::IsTrue( read == container1 );
 			ReadData(file,read);
 			Assert::IsTrue( read == container2 );
+
+			Assert::IsTrue( file.GetPosition() == written );
+		}
+		TEST_METHOD(UT_WriteDataReadData_mit_load_ctor)
+		{
+			CMemFile file;
+
+			load_ctor data{6};
+			
+			WriteData(&file,data);
+			WriteData(&file,data);
+
+			auto written = file.GetPosition();
+			file.Seek(0,CFile::begin);
+
+			auto read = ReadData<load_ctor>(&file);
+			Assert::IsTrue( read.i == data.i );
+			std::string str{"hallo"};
+			read = ReadData<load_ctor>(&file,5,str);
+			Assert::IsTrue( read.i == data.i );
+
+			Assert::IsTrue( file.GetPosition() == written );
+		}
+		TEST_METHOD(UT_WriteDataReadData_mit_load_bool_ctor)
+		{
+			CMemFile file;
+
+			load_bool_ctor data{short(6)};
+
+			WriteData(&file,data);
+
+			auto written = file.GetPosition();
+			file.Seek(0,CFile::begin);
+
+			auto read = ReadData<load_bool_ctor>(&file);
+			Assert::IsTrue( read.i == data.i );
+
+			Assert::IsTrue( file.GetPosition() == written );
+		}
+		TEST_METHOD(UT_WriteDataReadData_mit_load_ctor_with_params)
+		{
+			CMemFile file;
+
+			load_with_params data{short(6)};
+			load_with_params read;
+
+			WriteData(&file,data);
+			WriteData(&file,data);
+
+			auto written = file.GetPosition();
+			file.Seek(0,CFile::begin);
+
+			auto ptr = std::make_unique<int>(4);
+
+			ReadData(&file, read, std::move(ptr));
+			Assert::IsTrue( read.i == data.i );
+			Assert::IsTrue( read.ptr == ptr.get() );
+
+			ReadData(&file, read, ptr);
+			Assert::IsTrue( read.i == data.i );
+			Assert::IsTrue( read.ptr == ptr.get() );
 
 			Assert::IsTrue( file.GetPosition() == written );
 		}

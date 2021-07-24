@@ -32,7 +32,7 @@ template<typename io_interface,typename char_t,size_t size> auto ReadData( io_in
 	if(chars>size)
 		throw WS::ReadDateOutOfBound{__FUNCTION__ " array zu klein für die zu lesenden Daten"};
 	
-	ReadData( std::forward<io_interface>(io), value, chars*sizeof(char_t) );
+	_ReadData( std::forward<io_interface>(io), value, chars*sizeof(char_t) );
 	if( chars < size )
 		//nicht vollständig gefüllt, also 0-terminieren
 		value[chars] = char_t{0};
@@ -42,7 +42,7 @@ template<typename io_interface,typename char_t, size_t size> auto WriteData( io_
 	size_t chars = 0;
 	for( ;chars<size && value[chars]; ++chars ){}
 	WriteData( std::forward<io_interface>(io), chars );
-	WriteData( std::forward<io_interface>(io), value, chars * sizeof(char_t) );
+	_WriteData( std::forward<io_interface>(io), value, chars * sizeof(char_t) );
 }
 template<typename io_interface,typename char_t,size_t size> auto WriteData( io_interface && io, char_t (&value)[size] ) ->std::enable_if_t<WS::is_char_type_v<char_t>,void>
 {
