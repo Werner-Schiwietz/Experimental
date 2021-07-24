@@ -605,7 +605,7 @@ namespace UT_ReadWriteData
 			auto written = file.GetPosition();
 			file.Seek(0,CFile::begin);
 
-			static_assert( decltype(has_Load_ctor<A,CFile*>(0))::value );
+			static_assert( decltype(HasMethod_Load<A,CFile*>(0))::value );
 			auto valueRead = ReadData<decltype(value)>(pFile);
 			Assert::IsTrue( valueRead==nullptr );
 			ReadData(ReadWrite_CFile(file), valueRead);
