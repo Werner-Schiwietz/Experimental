@@ -32,7 +32,6 @@ template<typename return_type> struct Idata_input
 };
 #pragma endregion
 
-#pragma region lowlevel ReadWrite
 //SFINAE: Substitution Failure Is Not An Error
 template<typename T, typename io=CFile*, typename ... param_ts> auto HasMethod_ReadData(unsigned long) -> std::false_type;
 template<typename T, typename io=CFile*, typename ... param_ts> auto HasMethod_ReadData(int) -> decltype(WS::decllval<T>().ReadData(WS::decllval<io>(),WS::decllval<param_ts>()...) , std::true_type{});
@@ -56,6 +55,7 @@ template<typename T, typename io=CFile*, typename ... param_ts> auto Has_Load_ct
 template<typename T, typename io=CFile*, typename ... param_ts> static bool constexpr Has_Load_ctor_v = decltype(Has_Load_ctor<T,io,param_ts...>(0))::value;
 
 
+#pragma region lowlevel ReadWrite
 template<typename io_interface>auto _ReadData( io_interface && io, void * value, size_t bytes ) -> decltype( std::forward<io_interface>(io).Read( value, bytes ) )
 {
 	if constexpr ( std::is_integral_v<decltype( std::forward<io_interface>(io).Read( value, bytes ) )> )
@@ -69,7 +69,7 @@ template<typename io_interface>auto _ReadData( io_interface && io, void * value,
 	else
 		return std::forward<io_interface>(io).Read( value, bytes );
 }
-template<typename io_interface> auto _ReadData( io_interface && io, void* value, size_t bytes ) -> decltype( _ReadData( (*std::forward<io_interface>(io)),value,bytes) )
+template<typename io_interface>auto _ReadData( io_interface && io, void * value, size_t bytes ) -> decltype( _ReadData( (*std::forward<io_interface>(io)),value,bytes) )
 {
 	return _ReadData( (*std::forward<io_interface>(io)),value,bytes);
 }
@@ -86,7 +86,12 @@ template<typename io_interface>auto _WriteData( io_interface && io, void const *
 {
 	return std::forward<io_interface>(io)->Write( value, bytes );
 }
-
+//return-value ist der value-parameter
+template<typename io_interface>bool  WriteBool( io_interface && io, bool value )
+{
+	WriteData( std::forward<io_interface>(io), value );
+	return value;
+}
 #pragma endregion
 
 template<typename io_interface, typename T, typename ... param_ts>	auto ReadData( io_interface && io, T & value, param_ts && ... params  )
@@ -156,8 +161,7 @@ template<typename io_interface, typename T, typename ... Ts> auto WriteDatas( io
 #pragma region smart-pointer
 template<typename io_interface, typename ptr_t>	void _WriteData( io_interface && io, ptr_t const & value  )
 {
-	WriteData( std::forward<io_interface>(io), value!=nullptr );
-	if( value )
+	if( WriteBool( std::forward<io_interface>(io), value!=nullptr ) )
 	{
 		(void)WriteData( std::forward<io_interface>(io), *value );
 	}

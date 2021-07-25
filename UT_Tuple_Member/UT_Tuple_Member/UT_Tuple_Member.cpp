@@ -42,6 +42,7 @@ struct Member
 	template<size_t name> auto const & get() const & {return std::get<name>(member);}
 };
 
+
 namespace UT_TupleMember
 {
 	TEST_CLASS(UT_TupleMember)
@@ -50,10 +51,16 @@ namespace UT_TupleMember
 		MAKE_STRUCT(test_t,int,i,char const *,text) struct1;
 		TEST_METHOD(enum_namespace)
 		{
-			#pragma warning(suppress:26812)
-			auto x = enumNS::f;
-			decltype(enumNS::f) x2 = x;
-			decltype(x2) x3 = enumNS::l;x3;
+			[[gsl::suppress(26812)]]
+			{
+				auto x = enumNS::f;x;
+			}
+			{
+				#pragma warning(suppress:26812)
+				auto x = enumNS::f;
+				decltype(enumNS::f) x2 = x;
+				decltype(x2) x3 = enumNS::l;x3;
+			}
 		}
 		TEST_METHOD(UT_struct_name_WriteData_ReadData)
 		{
@@ -90,6 +97,18 @@ namespace UT_TupleMember
 
 
 		}
+		TEST_METHOD(TestMethod_enum_zu_wenig_eintraege)
+		{
+			enum class member{type_name0,type_name1};//??weniger enum-values als type, unsinn geht aber leider ohgne warning
+			using s_type = tuple_struct<member,int,char const *,short>;
+			auto s = s_type{}.set<s_type::member::type_name0>(5).set<s_type::member::type_name1>("hallo").set<member{2}>(6i16);//daemlich, geht aber
+			Assert::IsTrue( s.template access<s_type::member::type_name0>()==5);
+			Assert::IsTrue( s.access<s_type::member::type_name0>()==5);//getter
+			Assert::IsTrue( (s.access<s_type::member::type_name0>()=7) == 7 );//setter
+			Assert::IsTrue( s.access<s_type::member::type_name0>()==7);//getter
+			Assert::IsTrue( s.access<s_type::member::type_name1>()==std::string("hallo"));
+			Assert::IsTrue( s.access<member{2}>()==6);
+		}
 		TEST_METHOD(TestMethod3)
 		{
 			enum member{type_name0,type_name1};
@@ -102,9 +121,9 @@ namespace UT_TupleMember
 			Assert::IsTrue( s.access<0>()==5);
 			//
 			//Assert::IsTrue( strcmp(s.operator()<s_type::member::type_name1>(),"hallo")==0);
-			#pragma warning(suppress:4130)//warning C4130: '==': logical operation on address of string constant
+		#pragma warning(suppress:4130)//warning C4130: '==': logical operation on address of string constant
 			//Assert::IsTrue( s.operator()<s_type::member::type_name1>()=="hallo");
-			#pragma warning(suppress:4130)//warning C4130: '==': logical operation on address of string constant
+		#pragma warning(suppress:4130)//warning C4130: '==': logical operation on address of string constant
 			//Assert::IsTrue( s.template operator()<s_type::member::type_name1>()=="hallo");
 			//Assert::IsTrue( s.template <tuple_struct::type_name1>()=="hallo");
 		}

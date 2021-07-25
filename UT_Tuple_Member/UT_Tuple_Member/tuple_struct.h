@@ -12,17 +12,23 @@ struct tuple_struct
 
 	//template<member index> auto & operator()() &		{return std::get<index>(this->values);}				//operator() funktioniert, aber bringt für den aufrufer nichts, nur unverständnis. aufruf per v.[template ]operator()<0>(); [template ] optinal evtl. bei einigen compilern nötig
 	//template<member index> auto   operator()()  &&		{return std::move(std::get<index>(this->values));}	//operator() funktioniert, aber bringt für den aufrufer nichts, nur unverständnis
-	template<member index> auto & access() &			{return std::get<index>(this->values);}
-	template<member index> auto   access() &&			{return std::move(std::get<index>(this->values));}
+	template<member index> auto & access() &			
+	{
+		return std::get<std::underlying_type_t<member>(index)>(this->values);
+	}
+	template<member index> auto   access() &&			
+	{
+		return std::move(std::get<std::underlying_type_t<member>(index)>(this->values));
+	}
 
 	template<member index,typename T> tuple_struct& set(T&&value) &	
 	{
-		std::get<index>(this->values) = std::forward<T>(value);
+		std::get<std::underlying_type_t<member>(index)>(this->values) = std::forward<T>(value);
 		return *this;
 	}
 	template<member index,typename T> tuple_struct set(T&&value) &&
 	{
-		std::get<index>(this->values) = std::forward<T>(value);
+		std::get<std::underlying_type_t<member>(index)>(this->values) = std::forward<T>(value);
 		return std::move(*this);
 	}
 
