@@ -262,6 +262,26 @@ template<> struct _adder<void>
 	operator void() const {return;}
 };
 
+template<typename T> T const & foo_ret( T const & value )
+{
+	return value;
+}
+template<typename T> decltype(auto) foo( T && value ) 
+{
+	return foo_ret(std::forward<T>(value));
+}
+template<typename T> T&& foo1_ret( T && value )
+{
+	return std::forward<T>(value);
+}
+//template<typename T> auto foo1_ret( T && value ) -> std::enable_if<std::is_rvalue_reference_v<decltype(value)> == false,T const &>
+//{
+//	return value;
+//}
+template<typename T> decltype(auto) foo1( T && value ) 
+{
+	return foo1_ret(std::forward<T>(value));
+}
 
 namespace UT_ReadWriteData
 {
@@ -286,6 +306,35 @@ namespace UT_ReadWriteData
 				//auto v2 = _adder{return_void()};//ctor bestimmt T. geht nicht mit void
 				//v1.add( return_void() );//funktioniert nicht mit funktionen mit return_type void 
 				//v1.add( return_void() );
+			}
+		}
+		TEST_METHOD(std_forward)
+		{
+			{
+				decltype(foo( 5 )) i1 = foo( 5 );//??ref auf 5
+				Assert::IsTrue( i1 == 5 );
+				decltype(foo( i1 )) i2 = foo( i1 );
+				Assert::IsTrue( i2 == 5 );
+				decltype(auto) p1 = foo( std::make_unique<int>( 6 ) );//das kann nicht gut gehen, p1 ist tot, also dangling
+				auto && p2 = foo( p1 ); p2;
+			}
+			{
+				decltype(auto) i1 = foo1(5);
+				Assert::IsTrue( i1 == 5 );
+				decltype(auto) i2 = foo1(i1);
+				Assert::IsTrue( i2 == 5 );
+				decltype(auto) p1 = foo1(std::make_unique<int>(6));//das kann nicht gut gehen, p1 ist tot, also dangling
+				auto && p2 = foo1(p1);p2;
+				auto p11 = foo1(std::make_unique<int>(6));//so geht es, die refenenz ist weg, das wird gemoved
+				auto && p22 = foo1(p11);p22;
+				//auto p23 = foo1(p11);p23;//error C2280: 'std::unique_ptr<int,std::default_delete<int>>::unique_ptr(const std::unique_ptr<int,std::default_delete<int>> &)': attempting to reference a deleted function
+				foo1(p11);//error C2280: 'std::unique_ptr<int,std::default_delete<int>>::unique_ptr(const std::unique_ptr<int,std::default_delete<int>> &)': attempting to reference a deleted function
+				Assert::IsTrue( *p11 == 6 );
+				foo1(std::move(p11));//rvalue, nothing but
+				Assert::IsTrue( *p11 == 6 );
+				auto p24 = foo1(std::move(p11));//move it
+				Assert::IsTrue( p11 == nullptr );
+				Assert::IsTrue( *p24 == 6 );
 			}
 		}
 	};
