@@ -14,6 +14,7 @@ namespace UndoRedo
 		Undo,
 		Redo
 	};
+
 	struct IDoingText
 	{
 		using string_t = std::wstring;
@@ -65,9 +66,9 @@ namespace UndoRedo
 		}
 	};
 
-
 	class VW
 	{
+	protected:
 		class Action
 		{
 		public:
@@ -93,26 +94,35 @@ namespace UndoRedo
 			using base_t = std::stack<Action>;
 			base_t::container_type const & GetContainer() const { return this->c; }
 		};
-	public:
-		using action_t = Action::action_t;
-		using textcontainer_t = std::deque<Action::string_t>;
-	protected:
 		Stack undos;
 		Stack redos;
-
 	public:
-		void AddAndDo( action_t action, action_t undo );
-		void AddAndDo( action_t action, action_t undo, std::shared_ptr<IDoingText>);
+		using action_t = Action::action_t;//void(void) no return-value, throw excetion 
+		using textcontainer_t = std::deque<Action::string_t>;
 
-		bool Undo();
-		bool Redo();
+	#pragma region public interface
+		#pragma region adding new action
+			void Add( action_t action, action_t undo );
+			void Add( action_t action, action_t undo, std::shared_ptr<IDoingText>);
+			void AddAndDo( action_t action, action_t undo );
+			void AddAndDo( action_t action, action_t undo, std::shared_ptr<IDoingText>);
+		#pragma endregion 
 
-		textcontainer_t UndoTexte() const {return _Texte(undos, Direction::Undo);}
-		textcontainer_t RedoTexte() const {return _Texte(redos, Direction::Redo);}
+		#pragma region Undo-Redo-action
+			//return-value false -> no action avaiable
+			bool Undo();
+			bool Redo();
+		#pragma endregion 
+
+		#pragma region UserInterface strings
+			textcontainer_t UndoTexte() const {return _Texte(undos, Direction::Undo);}
+			textcontainer_t RedoTexte() const {return _Texte(redos, Direction::Redo);}
+		#pragma endregion 
+	#pragma endregion 
 	protected:
-		static textcontainer_t _Texte( Stack const &, Direction );
-		static bool		_action( Stack & from, Stack & to );
-		virtual void	_handle_redos();
+		static textcontainer_t	_Texte( Stack const &, Direction );
+		static bool				_action( Stack & from, Stack & to );
+		virtual void			_handle_redos();
 	};
 
 	inline VW::Action					VW::Action::InvokeAndToggle() &&	
@@ -160,17 +170,25 @@ namespace UndoRedo
 		return _action( this->redos, this->undos );
 	}
 
+	inline void VW::Add( action_t action, action_t undo, std::shared_ptr<IDoingText> doingtext )
+	{
+		_handle_redos();
+		undos.emplace( undo, action, doingtext );
+	}
+	inline void VW::Add( action_t action, action_t undo)
+	{
+		_handle_redos();
+		undos.emplace( undo, action );
+	}
 	inline void VW::AddAndDo( action_t action, action_t undo, std::shared_ptr<IDoingText> doingtext )
 	{
-		void handle_redos();
 		action();
-		undos.emplace( undo, action, doingtext );
+		Add( action, undo, doingtext );
 	}
 	inline void VW::AddAndDo( action_t action, action_t undo)
 	{
-		_handle_redos();
 		action();
-		undos.emplace( undo, action );
+		Add( action, undo );
 	}
 
 	inline VW::textcontainer_t VW::_Texte( Stack const & data, Direction direction )
