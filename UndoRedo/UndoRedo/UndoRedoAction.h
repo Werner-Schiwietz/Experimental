@@ -85,7 +85,8 @@ namespace UndoRedo
 			Action( action_t undo_action, action_t redo_action ) : Action( std::move(undo_action), std::move(redo_action), std::make_shared<DoingTextNone>() ){}
 
 		public:
-			Action				InvokeAndToggle() &&;
+			void				Invoke();
+			Action				Toggle() &&;
 			string_t const &	DoingText(Direction) const;
 		};
 		class Stack : public std::stack<Action>
@@ -125,18 +126,24 @@ namespace UndoRedo
 		virtual void			_handle_redos();
 	};
 
-	inline VW::Action					VW::Action::InvokeAndToggle() &&	
+	inline void							VW::Action::Invoke() 
 	{
 		if( this->direction == Direction::Redo )
 		{
 			redo_action();
-			this->direction = Direction::Undo;
 		}
 		else
 		{
 			undo_action();
-			this->direction = Direction::Redo;
 		}
+	}
+	inline VW::Action					VW::Action::Toggle() &&	
+	{
+		if( this->direction == Direction::Redo )
+			this->direction = Direction::Undo;
+		else
+			this->direction = Direction::Redo;
+
 		return std::move( *this );
 	}
 	inline VW::Action::string_t const &	VW::Action::DoingText(Direction direction) const
@@ -153,9 +160,10 @@ namespace UndoRedo
 	{
 		if(from.size())
 		{
-			auto action = std::move(from.top());
+			auto action = std::move(from.top());//
+			action.Invoke();
 			from.pop();
-			to.emplace(std::move(action).InvokeAndToggle());
+			to.emplace(std::move(action).Toggle());
 			return true;
 		}
 		return false;

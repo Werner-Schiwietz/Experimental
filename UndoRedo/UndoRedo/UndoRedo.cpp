@@ -11,7 +11,7 @@ namespace UT_UndoRedo
 	{
 	public:
 		
-		TEST_METHOD(TestMethod1)
+		TEST_METHOD(UndoRedo_IntIncDec)
 		{
 			int i=0;
 			UndoRedo::VW undo_redo;
