@@ -14,13 +14,20 @@ namespace UndoRedo
 		Undo,
 		Redo
 	};
+	inline Direction Toggle( Direction direction )
+	{
+		if( direction == Direction::Redo )
+			return Direction::Undo;
+		else
+			return Direction::Redo;
+	}
 
 	struct IDoingText
 	{
 		using string_t = std::wstring;
 		virtual ~IDoingText(){}
 
-		virtual string_t const & operator()(Direction) const = 0;
+		virtual string_t const &			operator()(Direction) const = 0;
 	};
 	class DoingTextNone : public IDoingText
 	{
@@ -68,6 +75,7 @@ namespace UndoRedo
 
 	class VW
 	{
+	#pragma region internal classes and member
 	protected:
 		class Action
 		{
@@ -86,22 +94,33 @@ namespace UndoRedo
 
 		public:
 			void				Invoke();
-			Action				Toggle() &&;
-			string_t const &	DoingText(Direction) const;
+			Action				MoveFromRedoToUndo() const &;//used by VWHoldAllRedos
+			Action				Toggle() &&;//transfer undo <-> redo stack
+			string_t const &	DoingText() const;
 		};
-		class Stack : public std::stack<Action>
+		class Stack : public std::stack<Action>//gives VW access to std::stack-container
 		{
 		public:
 			using base_t = std::stack<Action>;
 			base_t::container_type const & GetContainer() const { return this->c; }
+			void clear()
+			{
+				//moving data per swap to an temporary object
+				std::remove_reference_t<decltype(*this)>{}.swap(*this);
+			}
 		};
 		Stack undos;
 		Stack redos;
+	#pragma endregion
+
+	#pragma region internal used datatypes
 	public:
-		using action_t = Action::action_t;//void(void) no return-value, throw excetion 
+		using action_t = Action::action_t;//void(void) no return-value, throw exception 
 		using textcontainer_t = std::deque<Action::string_t>;
+	#pragma endregion
 
 	#pragma region public interface
+	public:
 		#pragma region adding new action
 			void Add( action_t action, action_t undo );
 			void Add( action_t action, action_t undo, std::shared_ptr<IDoingText>);
@@ -116,46 +135,68 @@ namespace UndoRedo
 		#pragma endregion 
 
 		#pragma region UserInterface strings
-			textcontainer_t UndoTexte() const {return _Texte(undos, Direction::Undo);}
-			textcontainer_t RedoTexte() const {return _Texte(redos, Direction::Redo);}
+			textcontainer_t UndoTexte() const {return _Texte(undos);}
+			textcontainer_t RedoTexte() const {return _Texte(redos);}
 		#pragma endregion 
 	#pragma endregion 
+
+	#pragma region internal used methods
 	protected:
-		static textcontainer_t	_Texte( Stack const &, Direction );
+		static textcontainer_t	_Texte( Stack const & );
 		static bool				_action( Stack & from, Stack & to );
-		virtual void			_handle_redos();
+		virtual void			_handle_redos();//was passiert mit den redos bei add. default clear()
+	#pragma endregion 
+	};
+	class VWHoldAllRedos : public VW
+	{
+	private:
+		virtual void			_handle_redos() override;//umkopieren von Redo-Stack auf den Undo-Stack, statt clear()
 	};
 
 	inline void							VW::Action::Invoke() 
 	{
 		if( this->direction == Direction::Redo )
-		{
 			redo_action();
-		}
 		else
-		{
 			undo_action();
-		}
 	}
 	inline VW::Action					VW::Action::Toggle() &&	
 	{
-		if( this->direction == Direction::Redo )
-			this->direction = Direction::Undo;
-		else
-			this->direction = Direction::Redo;
+		this->direction = UndoRedo::Toggle(this->direction);
 
 		return std::move( *this );
 	}
-	inline VW::Action::string_t const &	VW::Action::DoingText(Direction direction) const
+	inline VW::Action					VW::Action::MoveFromRedoToUndo() const &	
 	{
-		return (*doingtextPtr)(direction);
+		return *this;//just copy, used by VWHoldAllRedos::_handle_redos
+	}
+	inline VW::Action::string_t const &	VW::Action::DoingText() const
+	{
+		return (*doingtextPtr)(this->direction);
 	}
 
+	inline void VWHoldAllRedos::_handle_redos()
+	{	//kein redo geht verloren
+		std::remove_const_t<std::remove_reference_t<decltype(this->redos.GetContainer())>> data;
+
+		while( this->redos.size() )
+		{
+			auto action = std::move(this->redos.top());//
+			this->redos.pop();
+			data.emplace_front(action.MoveFromRedoToUndo());
+			this->undos.emplace(std::move(action).Toggle());
+		}
+		for( auto & action : data )
+		{
+			this->undos.emplace(std::move(action));
+		}
+	}
 	inline void VW::_handle_redos()
 	{
-		//simple, clear redos
-		decltype(this->redos){}.swap(this->redos);
+		//simple, clear redos, actions lost
+		this->redos.clear();
 	}
+
 	inline bool VW::_action( Stack & from, Stack & to )
 	{
 		if(from.size())
@@ -168,7 +209,6 @@ namespace UndoRedo
 		}
 		return false;
 	}
-
 	inline bool VW::Undo()
 	{
 		return _action( this->undos, this->redos );
@@ -199,12 +239,13 @@ namespace UndoRedo
 		Add( action, undo );
 	}
 
-	inline VW::textcontainer_t VW::_Texte( Stack const & data, Direction direction )
+	 
+	inline VW::textcontainer_t VW::_Texte( Stack const & data )//static
 	{
 		VW::textcontainer_t ret_value;
 		for( auto iter = data.GetContainer().rbegin(); iter != data.GetContainer().rend(); ++iter )
 		{
-			ret_value.push_back( iter->DoingText(direction) );
+			ret_value.push_back( iter->DoingText() );
 		}
 		return ret_value;
 	}

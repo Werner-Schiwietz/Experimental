@@ -5,12 +5,100 @@ using namespace Microsoft::VisualStudio::CppUnitTestFramework;
 
 #include "UndoRedoAction.h"
 
+namespace
+{
+	int stringtoi( char const * psz )
+	{
+		//#pragma COMPILEINFO(TODO Warning 4996) 
+		return atoi( psz );
+	}
+	int stringtoi( wchar_t const * psz )
+	{
+		//#pragma COMPILEINFO(TODO Warning 4996) 
+		return _wtoi( psz );
+	}
+}
+
 namespace UT_UndoRedo
 {
 	TEST_CLASS(UndoRedoTest)
 	{
 	public:
 		
+		TEST_METHOD(UndoRedo_VWHoldAllRedos)
+		{
+			int i=0;
+			UndoRedo::VWHoldAllRedos undo_redo;
+
+			struct doing
+			{
+				int & i;
+				int newvalue{};
+				doing(int & i, int newvalue) : i(i), newvalue(newvalue){}
+				void operator()(){this->i = this->newvalue;}
+			};
+
+			undo_redo.AddAndDo(doing{i,2},[&i,oldvalue=i]()->void {i=oldvalue;},std::make_shared<UndoRedo::DoingText>(L"0",L"2"));
+			Assert::IsTrue(i==2);
+			undo_redo.AddAndDo(doing{i,4},[&i,oldvalue=i]()->void {i=oldvalue;},std::make_shared<UndoRedo::DoingText>(L"2",L"4"));
+			Assert::IsTrue(i==4);
+			undo_redo.AddAndDo(doing{i,10},[&i,oldvalue=i]()->void {i=oldvalue;},std::make_shared<UndoRedo::DoingText>(L"4",L"10"));
+			Assert::IsTrue(i==10);
+			Assert::IsTrue(undo_redo.Undo());
+			Assert::IsTrue(i==4);
+			Assert::IsTrue(undo_redo.Undo());
+			Assert::IsTrue(i==2);
+			auto t_undo = undo_redo.UndoTexte();
+			auto t_redo = undo_redo.RedoTexte();
+			auto i_equ_FirstUndo = [&]()
+			{
+				return i==stringtoi(t_undo[0].c_str() );
+			};
+
+			Assert::IsTrue(i==2);
+			undo_redo.AddAndDo(doing{i,1},[&i,oldvalue=i]()->void {i=oldvalue;},std::make_shared<UndoRedo::DoingText>(L"2",L"1"));//die jetzigen redos  werden doppelt auf den undo-stack verschoben. damit bleibt jegliche jeweils gemachte aktion erhalten
+			Assert::IsTrue(i==1);
+			t_undo = undo_redo.UndoTexte();
+			t_redo = undo_redo.RedoTexte();
+
+			Assert::IsTrue(undo_redo.Undo());
+			Assert::IsTrue(i==2);
+			Assert::IsTrue(i_equ_FirstUndo());
+
+			t_undo = undo_redo.UndoTexte();
+			t_redo = undo_redo.RedoTexte();
+			Assert::IsTrue(undo_redo.Undo());
+			Assert::IsTrue(i==4);
+			Assert::IsTrue(i_equ_FirstUndo());
+
+			t_undo = undo_redo.UndoTexte();
+			t_redo = undo_redo.RedoTexte();
+			Assert::IsTrue(undo_redo.Undo());
+			Assert::IsTrue(i==10);
+			Assert::IsTrue(i_equ_FirstUndo());
+
+			t_undo = undo_redo.UndoTexte();
+			t_redo = undo_redo.RedoTexte();
+			Assert::IsTrue(undo_redo.Undo());
+			Assert::IsTrue(i==4);
+			Assert::IsTrue(i_equ_FirstUndo());
+
+			t_undo = undo_redo.UndoTexte();
+			t_redo = undo_redo.RedoTexte();
+			Assert::IsTrue(undo_redo.Undo());
+			Assert::IsTrue(i==2);
+			Assert::IsTrue(i_equ_FirstUndo());
+
+			t_undo = undo_redo.UndoTexte();
+			t_redo = undo_redo.RedoTexte();
+			Assert::IsTrue(undo_redo.Undo());
+			Assert::IsTrue(i==0);
+			Assert::IsTrue(i_equ_FirstUndo());
+
+			t_undo = undo_redo.UndoTexte();
+			t_redo = undo_redo.RedoTexte();
+			Assert::IsFalse(undo_redo.Undo());
+		}
 		TEST_METHOD(UndoRedo_IntIncDec)
 		{
 			int i=0;
