@@ -1,15 +1,75 @@
 #pragma once
 
 #include <functional>
-#include <stack>
-#include <string>
-#include <stdexcept>
 #include <memory>
 #include <deque>
+#include <string>
 
+#pragma region public interface
 namespace UndoRedo
 {
-	enum Direction
+	enum class Direction;
+
+#undef _INTERFACE_FUNCTION_
+#define _INTERFACE_FUNCTION_ = 0
+	struct IDoingText
+	{
+		using string_t = std::wstring;
+		virtual ~IDoingText(){}
+
+		virtual string_t const &			operator()(Direction) const _INTERFACE_FUNCTION_;
+	};
+#undef _INTERFACE_FUNCTION_
+#define _INTERFACE_FUNCTION_ override
+
+
+#undef _INTERFACE_FUNCTION_
+#define _INTERFACE_FUNCTION_ = 0
+	struct IPublic
+	{
+		using action_t = std::function<void( void )>;
+		using string_t = IDoingText::string_t;
+		using textcontainer_t = std::deque<IPublic::string_t>;
+		virtual ~IPublic(){}
+
+		#pragma region adding new action
+			virtual void Add( action_t action, action_t undo ) _INTERFACE_FUNCTION_;
+			virtual void Add( action_t action, action_t undo, std::shared_ptr<IDoingText>) _INTERFACE_FUNCTION_;
+			virtual void AddAndDo( action_t action, action_t undo ) _INTERFACE_FUNCTION_;
+			virtual void AddAndDo( action_t action, action_t undo, std::shared_ptr<IDoingText>) _INTERFACE_FUNCTION_;
+		#pragma endregion 
+
+		#pragma region Undo-Redo-action
+			//return-value false -> no action avaiable
+			virtual bool Undo() _INTERFACE_FUNCTION_;
+			virtual bool Redo() _INTERFACE_FUNCTION_;
+		#pragma endregion 
+
+		#pragma region UserInterface strings 
+			//next action at index 0
+			virtual textcontainer_t UndoTexte() const  _INTERFACE_FUNCTION_;
+			virtual textcontainer_t RedoTexte() const  _INTERFACE_FUNCTION_;
+		#pragma endregion 
+
+	};
+#undef _INTERFACE_FUNCTION_
+#define _INTERFACE_FUNCTION_ override
+
+	class VW;//normal
+	class VWHoldAllRedos;//extented losing no action
+	std::unique_ptr<UndoRedo::IPublic> CreateInterface();//benutzt VW, also same as UndoRedo::CreateInterface<VW>()
+	template<typename IPublic_Impl_t> std::unique_ptr<UndoRedo::IPublic> CreateInterface();//usage auto IPublicPtr = UndoRedo::CreateInterface<VWHoldAllRedos>();
+}
+#pragma endregion
+
+
+#pragma region definition of public interface
+#include <stack>
+#include <stdexcept>
+
+namespace UndoRedo//decalration
+{
+	enum class Direction
 	{
 		Undo,
 		Redo
@@ -22,17 +82,10 @@ namespace UndoRedo
 			return Direction::Redo;
 	}
 
-	struct IDoingText
-	{
-		using string_t = std::wstring;
-		virtual ~IDoingText(){}
-
-		virtual string_t const &			operator()(Direction) const = 0;
-	};
 	class DoingTextNone : public IDoingText
 	{
 	public:
-		virtual string_t const & operator()(Direction direction) const override 
+		virtual string_t const & operator()(Direction direction) const _INTERFACE_FUNCTION_
 		{
 			static string_t const textUndo{L"Undo"};
 			static string_t const textRedo{L"Redo"};
@@ -52,7 +105,7 @@ namespace UndoRedo
 		string_t text;
 	public:
 		DoingTextSimple(string_t text) : text(std::move(text)){}
-		virtual string_t const & operator()(Direction) const override { return this->text; }
+		virtual string_t const & operator()(Direction) const _INTERFACE_FUNCTION_ { return this->text; }
 	};
 	class DoingText : public IDoingText
 	{
@@ -60,7 +113,7 @@ namespace UndoRedo
 		string_t textRedo;
 	public:
 		DoingText(string_t textUndo, string_t textRedo) : textUndo(std::move(textUndo)),textRedo(std::move(textRedo)){}
-		virtual string_t const & operator()(Direction direction) const override 
+		virtual string_t const & operator()(Direction direction) const _INTERFACE_FUNCTION_ 
 		{ 
 			switch(direction)
 			{
@@ -73,15 +126,15 @@ namespace UndoRedo
 		}
 	};
 
-	class VW
+	class VW : public IPublic
 	{
 	#pragma region internal classes and member
 	protected:
 		class Action
 		{
 		public:
-			using action_t = std::function<void( void )>;
-			using string_t = IDoingText::string_t;
+			using action_t = IPublic::action_t;
+			using string_t = IPublic::string_t;
 		private:
 			Direction					direction {Direction::Undo};
 			action_t					undo_action;
@@ -115,28 +168,28 @@ namespace UndoRedo
 
 	#pragma region internal used datatypes
 	public:
-		using action_t = Action::action_t;//void(void) no return-value, throw exception 
-		using textcontainer_t = std::deque<Action::string_t>;
+		using action_t = IPublic::action_t;//void(void) no return-value, throw exception 
+		using textcontainer_t = IPublic::textcontainer_t;
 	#pragma endregion
 
 	#pragma region public interface
 	public:
 		#pragma region adding new action
-			void Add( action_t action, action_t undo );
-			void Add( action_t action, action_t undo, std::shared_ptr<IDoingText>);
-			void AddAndDo( action_t action, action_t undo );
-			void AddAndDo( action_t action, action_t undo, std::shared_ptr<IDoingText>);
+			void Add( action_t action, action_t undo ) _INTERFACE_FUNCTION_;
+			void Add( action_t action, action_t undo, std::shared_ptr<IDoingText>) _INTERFACE_FUNCTION_;
+			void AddAndDo( action_t action, action_t undo ) _INTERFACE_FUNCTION_;
+			void AddAndDo( action_t action, action_t undo, std::shared_ptr<IDoingText>) _INTERFACE_FUNCTION_;
 		#pragma endregion 
 
 		#pragma region Undo-Redo-action
 			//return-value false -> no action avaiable
-			bool Undo();
-			bool Redo();
+			bool Undo() _INTERFACE_FUNCTION_;
+			bool Redo() _INTERFACE_FUNCTION_;
 		#pragma endregion 
 
 		#pragma region UserInterface strings
-			textcontainer_t UndoTexte() const {return _Texte(undos);}
-			textcontainer_t RedoTexte() const {return _Texte(redos);}
+			textcontainer_t UndoTexte() const  _INTERFACE_FUNCTION_ {return _Texte(undos);}
+			textcontainer_t RedoTexte() const  _INTERFACE_FUNCTION_ {return _Texte(redos);}
 		#pragma endregion 
 	#pragma endregion 
 
@@ -152,7 +205,24 @@ namespace UndoRedo
 	private:
 		virtual void			_handle_redos() override;//umkopieren von Redo-Stack auf den Undo-Stack, statt clear()
 	};
+}
 
+namespace WS
+{
+	//reverse range-based for
+	template<typename iterable_t> struct reverse
+	{
+		iterable_t & iterable;
+		explicit reverse(iterable_t & iterable) : iterable(iterable){}
+
+		auto begin() const noexcept(noexcept(std::rbegin(std::declval<iterable_t>()))){ return std::rbegin(this->iterable); }
+		auto end() const noexcept(noexcept(std::rend(std::declval<iterable_t>()))){ return std::rend(this->iterable); }
+	};
+	template<typename container_t> auto Reverse(container_t & container){ return reverse<container_t>(container);}//komfortFuktion mit c++17 nicht mehr nötig
+}
+
+namespace UndoRedo//definition
+{
 	inline void							VW::Action::Invoke() 
 	{
 		if( this->direction == Direction::Redo )
@@ -163,7 +233,6 @@ namespace UndoRedo
 	inline VW::Action					VW::Action::Toggle() &&	
 	{
 		this->direction = UndoRedo::Toggle(this->direction);
-
 		return std::move( *this );
 	}
 	inline VW::Action					VW::Action::MoveFromRedoToUndo() const &	
@@ -176,17 +245,17 @@ namespace UndoRedo
 	}
 
 	inline void VWHoldAllRedos::_handle_redos()
-	{	//kein redo geht verloren
+	{	//move redos to undo-stack
 		std::remove_const_t<std::remove_reference_t<decltype(this->redos.GetContainer())>> data;
 
 		while( this->redos.size() )
 		{
 			auto action = std::move(this->redos.top());//
 			this->redos.pop();
-			data.emplace_front(action.MoveFromRedoToUndo());
-			this->undos.emplace(std::move(action).Toggle());
+			data.emplace_front(action.MoveFromRedoToUndo());//realize undoing
+			this->undos.emplace(std::move(action).Toggle());//move as undoing to undo-stack without action
 		}
-		for( auto & action : data )
+		for( auto & action : data )//move redoing to undo-stack without action
 		{
 			this->undos.emplace(std::move(action));
 		}
@@ -197,7 +266,7 @@ namespace UndoRedo
 		this->redos.clear();
 	}
 
-	inline bool VW::_action( Stack & from, Stack & to )
+	inline bool VW::_action( Stack & from, Stack & to )//static
 	{
 		if(from.size())
 		{
@@ -239,14 +308,33 @@ namespace UndoRedo
 		Add( action, undo );
 	}
 
-	 
 	inline VW::textcontainer_t VW::_Texte( Stack const & data )//static
 	{
 		VW::textcontainer_t ret_value;
-		for( auto iter = data.GetContainer().rbegin(); iter != data.GetContainer().rend(); ++iter )
+		for( decltype(auto) action : WS::Reverse(data.GetContainer()) )
 		{
-			ret_value.push_back( iter->DoingText() );
+			ret_value.push_back( action.DoingText() );
 		}
+		//for( auto iter = data.GetContainer().rbegin(); iter != data.GetContainer().rend(); ++iter )
+		//{
+		//	ret_value.push_back( (*iter).DoingText() );
+		//}
 		return ret_value;
 	}
+
+	template<typename IPublic_Impl_t> std::unique_ptr<UndoRedo::IPublic> CreateInterface()
+	{
+		return std::make_unique<IPublic_Impl_t>();
+	}
+	template<> inline std::unique_ptr<UndoRedo::IPublic> CreateInterface<VWHoldAllRedos>()
+	{
+		return std::make_unique<VWHoldAllRedos>();
+	}
+	inline std::unique_ptr<UndoRedo::IPublic> CreateInterface()
+	{
+		return CreateInterface<VW>();
+	}
+
 }
+#pragma endregion
+
