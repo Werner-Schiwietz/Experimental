@@ -3,19 +3,22 @@
 
 using namespace Microsoft::VisualStudio::CppUnitTestFramework;
 
-#include "UndoRedoAction.h"
+#define USE_STD_STRING
+#ifdef USE_STD_STRING
+	#define UndoRedo_StringType std::string
+	#define _Text(t) t
+#else
+	//UndoRedo_StringType not nessessary, default string_type is std::wstring
+	//#define UndoRedo_StringType std::wstring
+	#define _Text(t) L ## t
+#endif
 
-namespace
-{
-	int stringtoi( char const * psz )
-	{
-		return atoi( psz );
-	}
-	int stringtoi( wchar_t const * psz )
-	{
-		return _wtoi( psz );
-	}
-}
+
+#include "UndoRedoAction.h"
+#include "..\..\..\WernersTools\headeronly\char_helper.h"
+
+
+//auto x = tostring<char const *>(5);//error C2338: it must be a string-class like std::wstring CString ...
 
 namespace UT_UndoRedo
 {
@@ -36,11 +39,11 @@ namespace UT_UndoRedo
 				void operator()(){this->i = this->newvalue;}
 			};
 
-			(*undo_redoPtr).AddAndDo(doing{i,2},[&i,oldvalue=i]()->void {i=oldvalue;},std::make_shared<UndoRedo::DoingText>(L"0",L"2"));
+			(*undo_redoPtr).AddAndDo(doing{i,2},[&i,oldvalue=i]()->void {i=oldvalue;},std::make_shared<UndoRedo::DoingText>(tostring<UndoRedo::string_t>(0),tostring<UndoRedo::string_t>(2)));
 			Assert::IsTrue(i==2);
-			(*undo_redoPtr).AddAndDo(doing{i,4},[&i,oldvalue=i]()->void {i=oldvalue;},std::make_shared<UndoRedo::DoingText>(L"2",L"4"));
+			(*undo_redoPtr).AddAndDo(doing{i,4},[&i,oldvalue=i]()->void {i=oldvalue;},std::make_shared<UndoRedo::DoingText>(tostring<UndoRedo::string_t>(2),tostring<UndoRedo::string_t>(4)));
 			Assert::IsTrue(i==4);
-			(*undo_redoPtr).AddAndDo(doing{i,10},[&i,oldvalue=i]()->void {i=oldvalue;},std::make_shared<UndoRedo::DoingText>(L"4",L"10"));
+			(*undo_redoPtr).AddAndDo(doing{i,10},[&i,oldvalue=i]()->void {i=oldvalue;},std::make_shared<UndoRedo::DoingText>(tostring<UndoRedo::string_t>(4),tostring<UndoRedo::string_t>(10)));
 			Assert::IsTrue(i==10);
 			Assert::IsTrue((*undo_redoPtr).Undo());
 			Assert::IsTrue(i==4);
@@ -54,7 +57,7 @@ namespace UT_UndoRedo
 			};
 
 			Assert::IsTrue(i==2);
-			(*undo_redoPtr).AddAndDo(doing{i,1},[&i,oldvalue=i]()->void {i=oldvalue;},std::make_shared<UndoRedo::DoingText>(L"2",L"1"));//die jetzigen redos  werden doppelt auf den undo-stack verschoben. damit bleibt jegliche jeweils gemachte aktion erhalten
+			(*undo_redoPtr).AddAndDo(doing{i,1},[&i,oldvalue=i]()->void {i=oldvalue;},std::make_shared<UndoRedo::DoingText>(tostring<UndoRedo::string_t>(2),tostring<UndoRedo::string_t>(1)));//die jetzigen redos  werden doppelt auf den undo-stack verschoben. damit bleibt jegliche jeweils gemachte aktion erhalten
 			Assert::IsTrue(i==1);
 			t_undo = (*undo_redoPtr).UndoTexte();
 			t_redo = (*undo_redoPtr).RedoTexte();
@@ -162,9 +165,9 @@ namespace UT_UndoRedo
 				++i;
 			};
 
-			(*undo_redoPtr).AddAndDo(doing,undo,std::make_shared<UndoRedo::DoingTextSimple>(L"0"));
-			(*undo_redoPtr).AddAndDo(doing,undo,std::make_shared<UndoRedo::DoingTextSimple>(L"1"));
-			(*undo_redoPtr).AddAndDo(doing,undo,std::make_shared<UndoRedo::DoingTextSimple>(L"2"));
+			(*undo_redoPtr).AddAndDo(doing,undo,std::make_shared<UndoRedo::DoingTextSimple>(tostring<UndoRedo::string_t>(0)));
+			(*undo_redoPtr).AddAndDo(doing,undo,std::make_shared<UndoRedo::DoingTextSimple>(tostring<UndoRedo::string_t>(1)));
+			(*undo_redoPtr).AddAndDo(doing,undo,std::make_shared<UndoRedo::DoingTextSimple>(tostring<UndoRedo::string_t>(2)));
 
 			auto texte = (*undo_redoPtr).UndoTexte();
 			Assert::IsTrue(texte.size()==3);
@@ -205,6 +208,13 @@ namespace UT_UndoRedo
 			Assert::IsTrue(texte.size()==0);
 			texte = (*undo_redoPtr).RedoTexte();
 			Assert::IsTrue(texte.size()==3);
+
+			(*undo_redoPtr).AddAndDo(doing,undo);
+			texte = (*undo_redoPtr).UndoTexte();
+			Assert::IsTrue( stringcmp(texte[0].c_str(),_Text("Undo"))==0);
+			(*undo_redoPtr).Undo();
+			texte = (*undo_redoPtr).RedoTexte();
+			Assert::IsTrue( stringcmp(texte[0].c_str(),_Text("Redo"))==0);
 		}
 	};
 }

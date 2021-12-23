@@ -1,20 +1,38 @@
 #pragma once
+//Copyright (c) 2020 Werner Schiwietz
+//Jedem, der eine Kopie dieser Software und der zugehörigen Dokumentationsdateien (die "Software") erhält, wird hiermit kostenlos die Erlaubnis erteilt, 
+//ohne Einschränkung mit der Software zu handeln, einschließlich und ohne Einschränkung der Rechte zur Nutzung, zum Kopieren, Ändern, Zusammenführen, Veröffentlichen, 
+//Verteilen, Unterlizenzieren und/oder Verkaufen von Kopien der Software, und Personen, denen die Software zur Verfügung gestellt wird, dies unter den folgenden Bedingungen zu gestatten:
+//Der obige Urheberrechtshinweis und dieser Genehmigungshinweis müssen in allen Kopien oder wesentlichen Teilen der Software enthalten sein.
+//DIE SOFTWARE WIRD OHNE MÄNGELGEWÄHR UND OHNE JEGLICHE AUSDRÜCKLICHE ODER STILLSCHWEIGENDE GEWÄHRLEISTUNG, EINSCHLIEßLICH, ABER NICHT BESCHRÄNKT AUF
+//DIE GEWÄHRLEISTUNG DER MARKTGÄNGIGKEIT, DER EIGNUNG FÜR EINEN BESTIMMTEN ZWECK UND DER NICHTVERLETZUNG VON RECHTEN DRITTER, ZUR VERFÜGUNG GESTELLT. 
+//DIE AUTOREN ODER URHEBERRECHTSINHABER SIND IN KEINEM FALL HAFTBAR FÜR ANSPRÜCHE, SCHÄDEN ODER ANDERE VERPFLICHTUNGEN, OB IN EINER VERTRAGS- ODER 
+//HAFTUNGSKLAGE, EINER UNERLAUBTEN HANDLUNG ODER ANDERWEITIG, DIE SICH AUS, AUS ODER IN VERBINDUNG MIT DER SOFTWARE ODER DER NUTZUNG ODER ANDEREN 
+//GESCHÄFTEN MIT DER SOFTWARE ERGEBEN. 
+
+/// Undo-Redo doing with need C++17 (if constexpr)
+/// usage see unittest UndoRedo.cpp
+/// 
 
 #include <functional>
 #include <memory>
 #include <deque>
 #include <string>
 
+#ifndef UndoRedo_StringType
+	#define UndoRedo_StringType std::wstring
+#endif
 #pragma region public interface
 namespace UndoRedo
 {
 	enum class Direction;
+	using string_t = UndoRedo_StringType;
 
 #undef _INTERFACE_FUNCTION_
 #define _INTERFACE_FUNCTION_ = 0
 	struct IDoingText
 	{
-		using string_t = std::wstring;
+		using string_t = UndoRedo::string_t;
 		virtual ~IDoingText(){}
 
 		virtual string_t const &			operator()(Direction) const _INTERFACE_FUNCTION_;
@@ -56,7 +74,7 @@ namespace UndoRedo
 #define _INTERFACE_FUNCTION_ override
 
 	class VW;//normal
-	class VWHoldAllRedos;//extented losing no action
+	class VWHoldAllRedos;//extented, losing no action
 	std::unique_ptr<UndoRedo::IPublic> CreateInterface();//benutzt VW, also same as UndoRedo::CreateInterface<VW>()
 	template<typename IPublic_Impl_t> std::unique_ptr<UndoRedo::IPublic> CreateInterface();//usage auto IPublicPtr = UndoRedo::CreateInterface<VWHoldAllRedos>();
 }
@@ -87,8 +105,8 @@ namespace UndoRedo//decalration
 	public:
 		virtual string_t const & operator()(Direction direction) const _INTERFACE_FUNCTION_
 		{
-			static string_t const textUndo{L"Undo"};
-			static string_t const textRedo{L"Redo"};
+			static string_t const textUndo{UndoText<string_t>()};
+			static string_t const textRedo{RedoText<string_t>()};
 
 			switch(direction)
 			{
@@ -99,6 +117,26 @@ namespace UndoRedo//decalration
 			}
 			throw std::invalid_argument( __FUNCSIG__ " direction unknown " );
 		}
+		#pragma region string_helper
+		template<typename string_type> static string_type UndoText()
+		{
+			if constexpr ( std::is_constructible_v<string_type,char const *> )
+				return "Undo";
+			else if constexpr ( std::is_constructible_v<string_type,wchar_t const *> )
+				return L"Undo";
+			else
+				static_assert(false,"what?");
+		}
+		template<typename string_type> static string_type RedoText()
+		{
+			if constexpr ( std::is_constructible_v<string_type,char const *> )
+				return "Redo";
+			else if constexpr ( std::is_constructible_v<string_type,wchar_t const *> )
+				return L"Redo";
+			else
+				static_assert(false,"what?");
+		}
+		#pragma endregion 
 	};
 	class DoingTextSimple : public IDoingText
 	{
@@ -334,7 +372,6 @@ namespace UndoRedo//definition
 	{
 		return CreateInterface<VW>();
 	}
-
 }
 #pragma endregion
 
