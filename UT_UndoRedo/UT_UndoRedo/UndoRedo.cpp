@@ -39,66 +39,39 @@ namespace UT_UndoRedo
 				void operator()(){this->i = this->newvalue;}
 			};
 
-			(*undo_redoPtr).AddAndDo(doing{i,2},[&i,oldvalue=i]()->void {i=oldvalue;},std::make_shared<UndoRedo::DoingText>(tostring<UndoRedo::string_t>(0),tostring<UndoRedo::string_t>(2)));
-			Assert::IsTrue(i==2);
-			(*undo_redoPtr).AddAndDo(doing{i,4},[&i,oldvalue=i]()->void {i=oldvalue;},std::make_shared<UndoRedo::DoingText>(tostring<UndoRedo::string_t>(2),tostring<UndoRedo::string_t>(4)));
-			Assert::IsTrue(i==4);
-			(*undo_redoPtr).AddAndDo(doing{i,10},[&i,oldvalue=i]()->void {i=oldvalue;},std::make_shared<UndoRedo::DoingText>(tostring<UndoRedo::string_t>(4),tostring<UndoRedo::string_t>(10)));
-			Assert::IsTrue(i==10);
+			int newvalue = 2;
+			(*undo_redoPtr).AddAndDo(doing{i,newvalue},[&i,oldvalue=i]()->void {i=oldvalue;},std::make_shared<UndoRedo::DoingText>(tostring<UndoRedo::string_t>(i),tostring<UndoRedo::string_t>(newvalue)));
+			Assert::IsTrue(i==newvalue);
+			newvalue = 4;
+			(*undo_redoPtr).AddAndDo(doing{i,newvalue},[&i,oldvalue=i]()->void {i=oldvalue;},std::make_shared<UndoRedo::DoingText>(tostring<UndoRedo::string_t>(i),tostring<UndoRedo::string_t>(newvalue)));
+			Assert::IsTrue(i==newvalue);
+			newvalue = 10;
+			(*undo_redoPtr).AddAndDo(doing{i,newvalue},[&i,oldvalue=i]()->void {i=oldvalue;},std::make_shared<UndoRedo::DoingText>(tostring<UndoRedo::string_t>(i),tostring<UndoRedo::string_t>(newvalue)));
+			Assert::IsTrue(i==newvalue);
 			Assert::IsTrue((*undo_redoPtr).Undo());
 			Assert::IsTrue(i==4);
 			Assert::IsTrue((*undo_redoPtr).Undo());
 			Assert::IsTrue(i==2);
-			auto t_undo = (*undo_redoPtr).UndoTexte();
-			auto t_redo = (*undo_redoPtr).RedoTexte();
+
+
+			Assert::IsTrue(i==2);
+			newvalue = 1;
+			(*undo_redoPtr).AddAndDo(doing{i,newvalue},[&i,oldvalue=i]()->void {i=oldvalue;},std::make_shared<UndoRedo::DoingText>(tostring<UndoRedo::string_t>(i),tostring<UndoRedo::string_t>(newvalue)));//die jetzigen redos  werden doppelt auf den undo-stack verschoben. damit bleibt jegliche jeweils gemachte aktion erhalten
+			Assert::IsTrue(i==newvalue);
+
 			auto i_equ_FirstUndo = [&]()
 			{
-				return i==stringtoi(t_undo[0].c_str() );
+				auto t_undo = (*undo_redoPtr).UndoTexte();
+				[[maybe_unused]]
+				auto t_redo = (*undo_redoPtr).RedoTexte();
+
+				if( ((*undo_redoPtr).Undo()) == false )
+					return false;
+
+				Assert::IsTrue(i==stringtoi(t_undo[0].c_str() ));
+				return true;
 			};
-
-			Assert::IsTrue(i==2);
-			(*undo_redoPtr).AddAndDo(doing{i,1},[&i,oldvalue=i]()->void {i=oldvalue;},std::make_shared<UndoRedo::DoingText>(tostring<UndoRedo::string_t>(2),tostring<UndoRedo::string_t>(1)));//die jetzigen redos  werden doppelt auf den undo-stack verschoben. damit bleibt jegliche jeweils gemachte aktion erhalten
-			Assert::IsTrue(i==1);
-			t_undo = (*undo_redoPtr).UndoTexte();
-			t_redo = (*undo_redoPtr).RedoTexte();
-
-			Assert::IsTrue((*undo_redoPtr).Undo());
-			Assert::IsTrue(i==2);
-			Assert::IsTrue(i_equ_FirstUndo());
-
-			t_undo = (*undo_redoPtr).UndoTexte();
-			t_redo = (*undo_redoPtr).RedoTexte();
-			Assert::IsTrue((*undo_redoPtr).Undo());
-			Assert::IsTrue(i==4);
-			Assert::IsTrue(i_equ_FirstUndo());
-
-			t_undo = (*undo_redoPtr).UndoTexte();
-			t_redo = (*undo_redoPtr).RedoTexte();
-			Assert::IsTrue((*undo_redoPtr).Undo());
-			Assert::IsTrue(i==10);
-			Assert::IsTrue(i_equ_FirstUndo());
-
-			t_undo = (*undo_redoPtr).UndoTexte();
-			t_redo = (*undo_redoPtr).RedoTexte();
-			Assert::IsTrue((*undo_redoPtr).Undo());
-			Assert::IsTrue(i==4);
-			Assert::IsTrue(i_equ_FirstUndo());
-
-			t_undo = (*undo_redoPtr).UndoTexte();
-			t_redo = (*undo_redoPtr).RedoTexte();
-			Assert::IsTrue((*undo_redoPtr).Undo());
-			Assert::IsTrue(i==2);
-			Assert::IsTrue(i_equ_FirstUndo());
-
-			t_undo = (*undo_redoPtr).UndoTexte();
-			t_redo = (*undo_redoPtr).RedoTexte();
-			Assert::IsTrue((*undo_redoPtr).Undo());
-			Assert::IsTrue(i==0);
-			Assert::IsTrue(i_equ_FirstUndo());
-
-			t_undo = (*undo_redoPtr).UndoTexte();
-			t_redo = (*undo_redoPtr).RedoTexte();
-			Assert::IsFalse((*undo_redoPtr).Undo());
+			while(i_equ_FirstUndo()){}
 		}
 		TEST_METHOD(UndoRedo_IntIncDec)
 		{
@@ -165,9 +138,9 @@ namespace UT_UndoRedo
 				++i;
 			};
 
-			(*undo_redoPtr).AddAndDo(doing,undo,std::make_shared<UndoRedo::DoingTextSimple>(tostring<UndoRedo::string_t>(0)));
-			(*undo_redoPtr).AddAndDo(doing,undo,std::make_shared<UndoRedo::DoingTextSimple>(tostring<UndoRedo::string_t>(1)));
-			(*undo_redoPtr).AddAndDo(doing,undo,std::make_shared<UndoRedo::DoingTextSimple>(tostring<UndoRedo::string_t>(2)));
+			(*undo_redoPtr).AddAndDo(doing,undo,std::make_shared<UndoRedo::DoingTextSimple>(tostring<UndoRedo::string_t>(i)));
+			(*undo_redoPtr).AddAndDo(doing,undo,std::make_shared<UndoRedo::DoingTextSimple>(tostring<UndoRedo::string_t>(i)));
+			(*undo_redoPtr).AddAndDo(doing,undo,std::make_shared<UndoRedo::DoingTextSimple>(tostring<UndoRedo::string_t>(i)));
 
 			auto texte = (*undo_redoPtr).UndoTexte();
 			Assert::IsTrue(texte.size()==3);
@@ -218,4 +191,47 @@ namespace UT_UndoRedo
 		}
 	};
 }
+
+#include <atlstr.h>
+namespace UT_tostring
+{
+	TEST_CLASS(tostringTest)
+	{
+		TEST_METHOD(UT_tostring)
+		{
+			{	//_mypow test wird aber nicht weiter verwendet
+				[[maybe_unused]] constexpr auto x =_mypow<2,8>();
+				[[maybe_unused]] constexpr auto y =_mypow<x,sizeof(_int16)>();
+				[[maybe_unused]] constexpr auto z =_mypow<x,sizeof(_int32)>();
+				[[maybe_unused]] constexpr auto z2 =_mypow<x,sizeof(_int32),_int64>();
+				[[maybe_unused]] unsigned int e = unsigned int{256};
+				[[maybe_unused]] unsigned int e2 = e*e;
+				[[maybe_unused]] unsigned int e3 = e*e2;
+				[[maybe_unused]] unsigned int e4 = e*e3;
+			}
+
+			Assert::IsTrue( tostring<std::string>(0765) == "501" ); //dezimal
+			Assert::IsTrue( tostring<std::string,8>(0765) == "765" ); //octal
+			Assert::IsTrue( tostring<std::string,16>(0765) == "1f5" ); //hex
+
+			Assert::IsTrue( tostring<std::string>(_int32{11}) == "11" ); //standard-basis = 10
+			Assert::IsTrue( tostring<std::string,2>(_int32{11}) == "1011" ); 
+			Assert::IsTrue( tostring<std::string,16>(_int32{11}) == "b" ); 
+
+			Assert::IsTrue( tostring<std::wstring,2>(_int64{0b1001'1001'0000'0000'1001'0000'1111'0101'1010}) ==L"100110010000000010010000111101011010" ); //binär
+			Assert::IsTrue( tostring<std::string,16>(_int64{0b1001'1001'0000'0000'1001'0000'1111'0101'1010}) == "990090f5a" ); //hex
+			Assert::IsTrue( tostring<std::string,8>(_int64{0b1001'1001'0000'0000'1001'0000'1111'0101'1010}) == "462002207532" ); //octal
+
+			Assert::IsTrue( tostring<CStringA>(_int32{11}) == "11" ); //standard-basis = 10
+			Assert::IsTrue( tostring<CStringA,2>(_int32{11}) == "1011" ); 
+			Assert::IsTrue( tostring<CStringA,16>(_int32{11}) == "b" ); 
+
+			Assert::IsTrue( tostring<CStringW,2>(_int64{0b1001'1001'0000'0000'1001'0000'1111'0101'1010}) ==L"100110010000000010010000111101011010" ); //binär
+			Assert::IsTrue( tostring<CStringA,16>(_int64{0b1001'1001'0000'0000'1001'0000'1111'0101'1010}) == "990090f5a" ); //hex
+			Assert::IsTrue( tostring<CStringA,8>(_int64{0b1001'1001'0000'0000'1001'0000'1111'0101'1010}) == "462002207532" ); //octal
+
+		}
+	};
+}
+
 
