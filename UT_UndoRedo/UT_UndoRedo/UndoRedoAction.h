@@ -50,38 +50,38 @@ namespace UndoRedo
 		using textcontainer_t = std::deque<IPublic::string_t>;
 		virtual ~IPublic(){}
 
-		#pragma region adding new action
+		#pragma region adding
 			virtual void Add( action_t action, action_t undo ) _INTERFACE_FUNCTION_;
 			virtual void Add( action_t action, action_t undo, std::shared_ptr<IDoingText>) _INTERFACE_FUNCTION_;
 			virtual void AddAndDo( action_t action, action_t undo ) _INTERFACE_FUNCTION_;
 			virtual void AddAndDo( action_t action, action_t undo, std::shared_ptr<IDoingText>) _INTERFACE_FUNCTION_;
-		#pragma endregion 
+		#pragma endregion new action
 
-		#pragma region Undo-Redo-action
+		#pragma region execute Undo-Redo-action
 			//return-value false -> no action avaiable
 			virtual bool Undo() _INTERFACE_FUNCTION_;
 			virtual bool Redo() _INTERFACE_FUNCTION_;
-		#pragma endregion 
+		#pragma endregion Undo-Redo-action
 
-		#pragma region UserInterface strings 
+		#pragma region UserInterface strings
 			//next action at index 0
 			virtual textcontainer_t UndoTexte() const  _INTERFACE_FUNCTION_;
 			virtual textcontainer_t RedoTexte() const  _INTERFACE_FUNCTION_;
-		#pragma endregion 
+		#pragma endregion UserInterface strings
 
 	};
 #undef _INTERFACE_FUNCTION_
 #define _INTERFACE_FUNCTION_ override
 
-	class VW;//normal
-	class VWHoldAllRedos;//extented, losing no action
+	class VW;//normal, bei neuer action wird ReDo-Puffer geleert
+	class VWHoldAllRedos;//extented, ReDo-Puffer wird auf UnDo-Puffer übertragen
 	std::unique_ptr<UndoRedo::IPublic> CreateInterface();//benutzt VW, also same as UndoRedo::CreateInterface<VW>()
 	template<typename IPublic_Impl_t> std::unique_ptr<UndoRedo::IPublic> CreateInterface();//usage auto IPublicPtr = UndoRedo::CreateInterface<VWHoldAllRedos>();
 }
 #pragma endregion
 
 
-#pragma region definition of public interface
+#pragma region definition 
 #include <stack>
 #include <stdexcept>
 
@@ -164,7 +164,11 @@ namespace UndoRedo//decalration
 		}
 	};
 
-	class VW : public IPublic
+	/// <summary>
+	/// IPublic_StdImpl vollständige Implementierung von  IPublic
+	/// es muss noch die pure virtual function handle_redos implementiert werden. Siehe VW und VWHoldAllRedos
+	/// </summary>
+	class IPublic_StdImpl : public IPublic
 	{
 	#pragma region internal classes and member
 	protected:
@@ -235,10 +239,21 @@ namespace UndoRedo//decalration
 	protected:
 		static textcontainer_t	_Texte( Stack const & );
 		static bool				_action( Stack & from, Stack & to );
-		virtual void			_handle_redos();//was passiert mit den redos bei add. default clear()
+		virtual void			_handle_redos() = 0;
 	#pragma endregion 
 	};
-	class VWHoldAllRedos : public VW
+	/// <summary>
+	/// VW. beim Add einer Action wird der ReDo-Puffer geleert
+	/// </summary>
+	class VW : public IPublic_StdImpl
+	{
+	private:
+		virtual void			_handle_redos() override;//umkopieren von Redo-Stack auf den Undo-Stack, statt clear()
+	};
+	/// <summary>
+	/// VWHoldAllRedos beim Add einer Action wird der ReDo-Puffer auf den UnDo-Puffer übertragen
+	/// </summary>
+	class VWHoldAllRedos : public IPublic_StdImpl
 	{
 	private:
 		virtual void			_handle_redos() override;//umkopieren von Redo-Stack auf den Undo-Stack, statt clear()
@@ -261,23 +276,23 @@ namespace WS
 
 namespace UndoRedo//definition
 {
-	inline void							VW::Action::Invoke() 
+	inline void											IPublic_StdImpl::Action::Invoke() 
 	{
 		if( this->direction == Direction::Redo )
 			redo_action();
 		else
 			undo_action();
 	}
-	inline VW::Action					VW::Action::Toggle() &&	
+	inline IPublic_StdImpl::Action						IPublic_StdImpl::Action::Toggle() &&	
 	{
 		this->direction = UndoRedo::Toggle(this->direction);
 		return std::move( *this );
 	}
-	inline VW::Action					VW::Action::MoveFromRedoToUndo() const &	
+	inline IPublic_StdImpl::Action						IPublic_StdImpl::Action::MoveFromRedoToUndo() const &	
 	{
 		return *this;//just copy, used by VWHoldAllRedos::_handle_redos
 	}
-	inline VW::Action::string_t const &	VW::Action::DoingText() const
+	inline IPublic_StdImpl::Action::string_t const &	IPublic_StdImpl::Action::DoingText() const
 	{
 		return (*doingtextPtr)(this->direction);
 	}
@@ -304,7 +319,7 @@ namespace UndoRedo//definition
 		this->redos.clear();
 	}
 
-	inline bool VW::_action( Stack & from, Stack & to )//static
+	inline bool IPublic_StdImpl::_action( Stack & from, Stack & to )//static
 	{
 		if(from.size())
 		{
@@ -316,39 +331,39 @@ namespace UndoRedo//definition
 		}
 		return false;
 	}
-	inline bool VW::Undo()
+	inline bool IPublic_StdImpl::Undo()
 	{
 		return _action( this->undos, this->redos );
 	}
-	inline bool VW::Redo()
+	inline bool IPublic_StdImpl::Redo()
 	{
 		return _action( this->redos, this->undos );
 	}
 
-	inline void VW::Add( action_t action, action_t undo, std::shared_ptr<IDoingText> doingtext )
+	inline void IPublic_StdImpl::Add( action_t action, action_t undo, std::shared_ptr<IDoingText> doingtext )
 	{
 		_handle_redos();
 		undos.emplace( undo, action, doingtext );
 	}
-	inline void VW::Add( action_t action, action_t undo)
+	inline void IPublic_StdImpl::Add( action_t action, action_t undo)
 	{
 		_handle_redos();
 		undos.emplace( undo, action );
 	}
-	inline void VW::AddAndDo( action_t action, action_t undo, std::shared_ptr<IDoingText> doingtext )
+	inline void IPublic_StdImpl::AddAndDo( action_t action, action_t undo, std::shared_ptr<IDoingText> doingtext )
 	{
 		action();
 		Add( action, undo, doingtext );
 	}
-	inline void VW::AddAndDo( action_t action, action_t undo)
+	inline void IPublic_StdImpl::AddAndDo( action_t action, action_t undo)
 	{
 		action();
 		Add( action, undo );
 	}
 
-	inline VW::textcontainer_t VW::_Texte( Stack const & data )//static
+	inline IPublic_StdImpl::textcontainer_t IPublic_StdImpl::_Texte( Stack const & data )//static
 	{
-		VW::textcontainer_t ret_value;
+		IPublic_StdImpl::textcontainer_t ret_value;
 		for( decltype(auto) action : WS::Reverse(data.GetContainer()) )
 		{
 			ret_value.push_back( action.DoingText() );
@@ -373,5 +388,5 @@ namespace UndoRedo//definition
 		return CreateInterface<VW>();
 	}
 }
-#pragma endregion
+#pragma endregion of public interface
 
